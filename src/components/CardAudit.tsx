@@ -78,8 +78,8 @@ return `
 const CardAudit: React.FC = () => {
     const [formData, setFormData] = useState<ParkingCard>({
         id: '',
-        securityToken: '',
-        locationId: '',
+        securityToken: 'C2278FFBCB774B26B7D1A1D54DE3A64C',
+        locationId: '340108',
         includeValid: 'True',
         includeInvalid: 'False',
         includeDeleted: 'False',
@@ -160,8 +160,19 @@ const CardAudit: React.FC = () => {
 
     return (
         <ThemeProvider theme={companyTheme}>
-            <Box sx={{ p: 3 }}>
-                <Card>
+            <Box
+                sx={{
+                    minHeight: '100vh',
+                    width: '100vw',
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    zIndex: -1,
+                    background: 'linear-gradient(135deg, #1976d2 0%, #2196f3 100%)',
+                    overflow: 'hidden',
+                }}>
+                
+                <Card sx={{ maxWidth: 1800, margin: 'auto', mt: 5, p: 3, backgroundColor: '#fff', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
                     <CardContent>
                         <Typography variant="h4" gutterBottom>
                             Parker Card Audit
@@ -179,7 +190,6 @@ const CardAudit: React.FC = () => {
                                     required
                                 />
                             </Stack>
-                            
                             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                                 <TextField
                                     fullWidth
