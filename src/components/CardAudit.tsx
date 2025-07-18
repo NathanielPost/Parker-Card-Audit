@@ -17,7 +17,9 @@ import {
   TableHead, 
   TableRow, 
   Paper, 
-  Box 
+  Box, 
+  Grid,
+  Divider
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
@@ -247,94 +249,112 @@ const CardAudit: React.FC = () => {
                         </Box>
                         
                         {/* Form Section */}
-                        <Stack spacing={3} sx={{ mb: 3 }}>
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    fullWidth
-                                    label="Security Token"
-                                    value={formData.securityToken}
-                                    onChange={handleInputChange('securityToken')}
-                                    variant="outlined"
-                                    required
-                                />
-                            </Stack>
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    fullWidth
-                                    label="Location ID"
-                                    value={formData.locationId}
-                                    onChange={handleInputChange('locationId')}
-                                    variant="outlined"
-                                    required
-                                />
-                                <TextField
-                                    fullWidth
-                                    label="Credential Number"
-                                    value={formData.CredentialNumber}
-                                    onChange={handleInputChange('CredentialNumber')}
-                                    variant="outlined"
-                                />
-                            </Stack>
+                        <Stack spacing={3} sx={{ mb: 3, backgroundColor: '#f8f9fa', borderRadius: 2, p: 2  }}>
+                            <Box>
+                                <Grid container spacing={1} px={4} mb={3}>
+                                    <Grid size={3}>
+                                        <Typography variant="h6">Request Parameters</Typography>
+                                    </Grid>
+                                    <Grid size={9}>
+                                        <Stack direction={{ xs: 'column', md: 'row' }} mb={2} spacing={2}>
+                                            <TextField
+                                                fullWidth
+                                                label="Security Token"
+                                                value={formData.securityToken}
+                                                onChange={handleInputChange('securityToken')}
+                                                variant="outlined"
+                                                required
+                                            />
+                                        </Stack>
+                                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                                            <TextField
+                                                fullWidth
+                                                label="Location ID"
+                                                value={formData.locationId}
+                                                onChange={handleInputChange('locationId')}
+                                                variant="outlined"
+                                                required
+                                            />
+                                            <TextField
+                                                fullWidth
+                                                label="Credential Number"
+                                                value={formData.CredentialNumber}
+                                                onChange={handleInputChange('CredentialNumber')}
+                                                variant="outlined"
+                                            />
+                                        </Stack>
+                                    </Grid> 
+                                </Grid> 
+                                <Divider variant="middle" sx={{ borderColor: '#B20838', my: 2 }} />
+                                <Grid container spacing={1} px={3} mb={3}>
+                                    <Grid size={3}  >
+                                        <Typography variant="h6">Request Filters</Typography>
+                                    </Grid>
+                                    <Grid size={9}>
+                                        <Stack direction={{ xs: 'column', md: 'row' }} mb={2} mt={2} spacing={2}>
+                                            <TextField
+                                                fullWidth
+                                                type="datetime-local"
+                                                label="Date"
+                                                value={formData.Date.toISOString().slice(0, 16)}
+                                                onChange={handleInputChange('Date')}
+                                                variant="outlined"
+                                                InputLabelProps={{ shrink: true }}
+                                            />
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Parker Status</InputLabel>
+                                                <Select
+                                                    value={formData.ParkerStatus}
+                                                    onChange={handleInputChange('ParkerStatus')}
+                                                    label="Parker Status"
+                                                >
+                                                    <MenuItem value="Active">Active</MenuItem>
+                                                    <MenuItem value="Inactive">Inactive</MenuItem>
+                                                    <MenuItem value="Deleted">Deleted</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Stack>
+                                        
+                                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Valid</InputLabel>
+                                                <Select
+                                                    value={formData.includeValid}
+                                                    onChange={handleInputChange('includeValid')}
+                                                    label="Include Valid"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Invalid</InputLabel>
+                                                <Select
+                                                    value={formData.includeInvalid}
+                                                    onChange={handleInputChange('includeInvalid')}
+                                                    label="Include Invalid"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Deleted</InputLabel>
+                                                <Select
+                                                    value={formData.includeDeleted}
+                                                    onChange={handleInputChange('includeDeleted')}
+                                                    label="Include Deleted"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Stack>
+                                    </Grid>
+                                </Grid>
+                            </Box>
+
                             
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <TextField
-                                    fullWidth
-                                    type="datetime-local"
-                                    label="Date"
-                                    value={formData.Date.toISOString().slice(0, 16)}
-                                    onChange={handleInputChange('Date')}
-                                    variant="outlined"
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Parker Status</InputLabel>
-                                    <Select
-                                        value={formData.ParkerStatus}
-                                        onChange={handleInputChange('ParkerStatus')}
-                                        label="Parker Status"
-                                    >
-                                        <MenuItem value="Active">Active</MenuItem>
-                                        <MenuItem value="Inactive">Inactive</MenuItem>
-                                        <MenuItem value="Deleted">Deleted</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Stack>
-                            
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Include Valid</InputLabel>
-                                    <Select
-                                        value={formData.includeValid}
-                                        onChange={handleInputChange('includeValid')}
-                                        label="Include Valid"
-                                    >
-                                        <MenuItem value="True">True</MenuItem>
-                                        <MenuItem value="False">False</MenuItem>
-                                    </Select>
-                                </FormControl>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Include Invalid</InputLabel>
-                                    <Select
-                                        value={formData.includeInvalid}
-                                        onChange={handleInputChange('includeInvalid')}
-                                        label="Include Invalid"
-                                    >
-                                        <MenuItem value="True">True</MenuItem>
-                                        <MenuItem value="False">False</MenuItem>
-                                    </Select>
-                                </FormControl>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Include Deleted</InputLabel>
-                                    <Select
-                                        value={formData.includeDeleted}
-                                        onChange={handleInputChange('includeDeleted')}
-                                        label="Include Deleted"
-                                    >
-                                        <MenuItem value="True">True</MenuItem>
-                                        <MenuItem value="False">False</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Stack>
                             
                             <Box>
                                 <Button
