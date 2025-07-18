@@ -15,6 +15,7 @@
   "scripts": {
     "dev": "npx vite",
     "build": "npx vite build",
-    "preview": "npx vite preview"
+    "preview": "npx vite preview",
+    "postinstall": "chmod +x node_modules/.bin/vite"
   }
 }
