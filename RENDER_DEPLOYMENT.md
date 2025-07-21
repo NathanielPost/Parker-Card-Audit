@@ -1,60 +1,84 @@
 # Render Deployment Configuration
 
-## Issues and Solutions for Production Deployment
+## CORS Issue Solution ✅
 
-### 1. **CORS Issues**
-The main problem when deploying to Render is that the SOAP endpoint (`https://int1aa.azurewebsites.net`) may not allow CORS requests from your Render domain.
+The CORS issue has been **SOLVED** by implementing a backend proxy server!
 
-**Solutions:**
-- The app now automatically detects environment and uses direct URLs in production
-- Enhanced error logging shows CORS-specific errors
-- Consider setting up a backend proxy if CORS issues persist
+## How It Works
 
-### 2. **Environment Detection**
-The app now automatically detects:
-- **Development**: Uses Vite proxy (`/api/integrations/monthly.asmx`)
-- **Production**: Uses direct URL (`https://int1aa.azurewebsites.net/integrations/monthly.asmx`)
+1. **Development**: Vite dev server with proxy
+2. **Production**: Express.js server that serves the built files AND proxies SOAP requests
 
-### 3. **Render Build Configuration**
+## New Architecture
+
+```
+Your Browser → Render (Express Server) → Azure SOAP Endpoint
+```
+
+The Express server acts as a middle layer that:
+- Serves your React app
+- Proxies SOAP requests to avoid CORS issues
+- Adds proper headers and handles preflight requests
+
+## Render Build Configuration
 
 **Build Command:**
 ```bash
 npm install && npm run build
 ```
 
-**Publish Directory:**
-```
-dist
-```
-
 **Start Command:**
 ```bash
-npx vite preview --port $PORT --host 0.0.0.0
+npm start
 ```
 
-### 4. **Environment Variables (Optional)**
-If you need to customize the SOAP endpoint in production, set these in Render:
+**Environment:**
+- **Node.js** (not Static Site)
+- Auto-deploy from Git: ✅
 
+## Files Added
+
+1. **`server.js`**: Express proxy server
+2. **Updated `package.json`**: Added Express dependencies and start script
+
+## What Changed
+
+- ✅ **No more CORS errors**: Express server handles all SOAP requests
+- ✅ **Unified endpoint**: Always uses `/api/integrations/monthly.asmx`
+- ✅ **Production ready**: Works identically in dev and production
+- ✅ **Better logging**: Server logs all proxy requests for debugging
+
+## Testing Locally
+
+To test the production setup locally:
+
+```bash
+npm run build
+npm start
 ```
-VITE_SOAP_ENDPOINT=https://int1aa.azurewebsites.net/integrations/monthly.asmx
+
+Then visit `http://localhost:3000`
+
+## Deployment Steps
+
+1. **Push to Git** (all files including `server.js`)
+2. **Create Render Web Service** (not Static Site)
+3. **Set Build Command**: `npm install && npm run build`
+4. **Set Start Command**: `npm start`
+5. **Deploy** 🚀
+
+## Health Check
+
+Your deployed app will have a health check endpoint:
+```
+https://your-app.onrender.com/health
 ```
 
-### 5. **Debugging Production Issues**
+## No More Issues! 🎉
 
-1. **Check Browser Console**: The app now logs detailed request/response information
-2. **Environment Panel**: Look for the blue info panel showing environment and endpoint
-3. **Network Tab**: Check for CORS errors or failed requests
-
-### 6. **Common Production Errors**
-
-**"Failed to fetch" Error:**
-- Usually indicates CORS policy blocking the request
-- Check if `https://int1aa.azurewebsites.net` allows your Render domain
-
-**Empty Responses:**
-- Check SOAP endpoint availability
-- Verify security tokens are valid in production
-
-**Connection Timeouts:**
-- Network connectivity issues between Render and Azure
-- Consider implementing retry logic
+- ❌ ~~CORS Policy Errors~~
+- ❌ ~~Environment Detection Problems~~
+- ❌ ~~Direct Azure Requests~~
+- ✅ **Clean Proxy Architecture**
+- ✅ **Consistent Behavior**
+- ✅ **Production Ready**

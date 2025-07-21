@@ -72,17 +72,8 @@ const companyTheme = createTheme({
 });
 
 
-// Environment-aware SOAP endpoint configuration
-const getSOAPEndpoint = () => {
-    // In development, use the proxy
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return '/api/integrations/monthly.asmx';
-    }
-    // In production (Render), use the direct URL
-    return 'https://int1aa.azurewebsites.net/integrations/monthly.asmx';
-};
-
-const SOAP_ENDPOINT = getSOAPEndpoint();
+// SOAP endpoint - always use /api path since we have a proxy server
+const SOAP_ENDPOINT = '/api/integrations/monthly.asmx';
 // Additional SOAP endpoints for detailed account data
 const SOAP_MONTHLY_ACCOUNT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyAccount';
 const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyVehicle';
@@ -861,9 +852,9 @@ const CardAudit: React.FC = () => {
                         {/* Environment Info Panel */}
                         <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
                             <Typography variant="body2" sx={{ fontWeight: 'medium', color: '#1565c0' }}>
-                                🌐 Environment: {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Development' : 'Production'}
+                                🌐 Mode: {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Development (Vite)' : 'Production (Express)'}
                                 &nbsp;|&nbsp;
-                                📡 SOAP Endpoint: {SOAP_ENDPOINT}
+                                📡 SOAP Endpoint: {SOAP_ENDPOINT} → https://int1aa.azurewebsites.net
                                 &nbsp;|&nbsp;
                                 🔧 SOAP Version: {soapVersion}
                             </Typography>
