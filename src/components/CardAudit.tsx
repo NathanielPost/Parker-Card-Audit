@@ -21,7 +21,8 @@ import {
   Grid,
   Divider,
   LinearProgress,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
@@ -177,6 +178,13 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
         // Check for GetAllMonthliesResult and any error messages
         const resultElement = xmlDoc.getElementsByTagName('GetAllMonthliesResult')[0];
         if (resultElement) {
+            // Debug: Log all child elements to see the actual structure
+            console.log(`🔍 GetAllMonthliesResult child elements:`);
+            for (let i = 0; i < resultElement.children.length; i++) {
+                const child = resultElement.children[i];
+                console.log(`  - ${child.tagName}: ${child.textContent || `[${child.children.length} children]`}`);
+            }
+            
             // Check if there's an error message in the result
             const messageElement = resultElement.getElementsByTagName('Message')[0];
             const codeElement = resultElement.getElementsByTagName('Code')[0];
@@ -194,28 +202,59 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
                     throw new Error(`API Error: ${code} - ${message}`);
                 }
             }
+            
+            // Look for Accounts container, then MonthlyAccountLite elements within it
+            const accountsContainer = resultElement.getElementsByTagName('Accounts')[0];
+            let accounts: Element[] = [];
+            
+            if (accountsContainer) {
+                console.log(`📋 Found Accounts container with ${accountsContainer.children.length} child elements`);
+                accounts = Array.from(accountsContainer.getElementsByTagName('MonthlyAccountLite'));
+            } else {
+                // Fallback: look for MonthlyAccountLite elements directly in the result
+                console.log(`⚠️ No Accounts container found, looking for MonthlyAccountLite elements directly`);
+                accounts = Array.from(resultElement.getElementsByTagName('MonthlyAccountLite'));
+            }
+            
+            console.log(`📋 Found ${accounts.length} MonthlyAccountLite elements`);
+            
+            const parsedAccounts: MonthlyAccountLite[] = accounts.map((account, index) => {
+                const getElementText = (tagName: string) => {
+                    const element = account.getElementsByTagName(tagName)[0];
+                    const value = element ? element.textContent || '' : '';
+                    if (index === 0) { // Log details for first account only to avoid spam
+                        console.log(`🏷️ Account ${index + 1} - ${tagName}: "${value}"`);
+                    }
+                    return value;
+                };
+                
+                const getElementBoolean = (tagName: string) => {
+                    const element = account.getElementsByTagName(tagName)[0];
+                    const textValue = element ? element.textContent || '' : '';
+                    const boolValue = textValue.toLowerCase() === 'true';
+                    if (index === 0) { // Log details for first account only
+                        console.log(`🏷️ Account ${index + 1} - ${tagName}: ${boolValue} (from "${textValue}")`);
+                    }
+                    return boolValue;
+                };
+                
+                return {
+                    AccountNumber: getElementText('AccountNumber'),
+                    FlashAccountNumber: getElementText('FlashAccountNumber'),
+                    Status: getElementText('Status'),
+                    IsDeleted: getElementBoolean('IsDeleted'), // Use proper boolean parsing
+                    Deleted: getElementText('IsDeleted'), // Keep string version for backward compatibility
+                    MonthlyAccountType: getElementText('MonthlyAccountType'),
+                };
+            });
+            
+            console.log(`✅ Successfully parsed ${parsedAccounts.length} accounts from GetAllMonthlies`);
+            return parsedAccounts;
         }
         
-        // Look for MonthlyAccountLite elements
-        const accounts = xmlDoc.getElementsByTagName('MonthlyAccountLite');
-        
-        const parsedAccounts: MonthlyAccountLite[] = Array.from(accounts).map((account) => {
-            const getElementText = (tagName: string) => {
-                const element = account.getElementsByTagName(tagName)[0];
-                return element ? element.textContent || '' : '';
-            };
-            
-            return {
-                AccountNumber: getElementText('AccountNumber'),
-                FlashAccountNumber: getElementText('FlashAccountNumber'),
-                Status: getElementText('Status'),
-                IsDeleted: getElementText('Deleted').toLowerCase() === 'true',
-                Deleted: getElementText('Deleted'),
-                MonthlyAccountType: getElementText('MonthlyAccountType'),
-            };
-        });
-        
-        return parsedAccounts;
+        // If no result element found, return empty array
+        console.log(`❌ No GetAllMonthliesResult element found in response`);
+        return [];
     } catch (error) {
         console.error('Error getting all monthly accounts:', error);
         return [];
@@ -269,10 +308,21 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
         // Extract account information from GetMonthlyAccount1Result
         const resultElement = xmlDoc.getElementsByTagName('GetMonthlyAccount1Result')[0];
         if (resultElement) {
+            // Debug: Log all child elements to see the actual structure
+            console.log(`🔍 GetMonthlyAccount1Result child elements for account ${flashAccountNumber}:`);
+            for (let i = 0; i < resultElement.children.length; i++) {
+                const child = resultElement.children[i];
+                console.log(`  - ${child.tagName}: ${child.textContent || `[${child.children.length} children]`}`);
+            }
+            
             // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
-                return element ? element.textContent || '' : '';
+                const value = element ? element.textContent || '' : '';
+                if (tagName === 'MonthlyAccountNumber' || tagName === 'AccountNumber' || tagName === 'Code' || tagName === 'Status') {
+                    console.log(`🏷️ ${tagName}: "${value}"`);
+                }
+                return value;
             };
             
             const code = getElementText('Code');
@@ -312,7 +362,7 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                         cars.push(vehicleGuid);
                     }
                 }
-                console.log(`🚗 Parsed ${cars.length} vehicles from CarProfile objects:`, cars);
+                // console.log(`🚗 Parsed ${cars.length} vehicles from CarProfile objects:`, cars);
             }
 
             // Extract Contacts array - now parsing ContactProfile objects
@@ -328,10 +378,10 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                         contacts.push(contactGuid);
                     }
                 }
-                console.log(`👥 Parsed ${contacts.length} contacts from ContactProfile objects:`, contacts);
+                // console.log(`👥 Parsed ${contacts.length} contacts from ContactProfile objects:`, contacts);
             }
 
-            return {
+            const accountResult = {
                 AccountType: getElementText('AccountType'),
                 Address: getElementText('Address'),
                 Address2: getElementText('Address2'),
@@ -359,10 +409,21 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                 Status: getElementText('Status'),
                 ValidUntil: getElementText('ValidUntil'),
                 Zipcode: getElementText('Zipcode'),
-                // For backward compatibility
-                AccountNumber: getElementText('MonthlyAccountNumber') || flashAccountNumber,
+                // For backward compatibility - ensure we have a proper AccountNumber
+                AccountNumber: getElementText('MonthlyAccountNumber') || getElementNumber('MonthlyAccountNumber').toString() || flashAccountNumber,
                 FlashAccountNumber: flashAccountNumber
             };
+
+            console.log(`✅ Parsed account result for ${flashAccountNumber}:`, {
+                AccountNumber: accountResult.AccountNumber,
+                MonthlyAccountNumber: accountResult.MonthlyAccountNumber,
+                CompanyName: accountResult.CompanyName,
+                Status: accountResult.Status,
+                ContactsCount: accountResult.Contacts?.length || 0,
+                CarsCount: accountResult.Cars?.length || 0
+            });
+
+            return accountResult;
         }
         
         return null;
@@ -518,6 +579,9 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
+        // Debug: Log the parsed XML structure
+        console.log(`🔍 Parsed XML for contact ${contactId}:`, xmlDoc);
+        
         // Check for SOAP faults first
         const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
         if (faultElements.length > 0) {
@@ -529,10 +593,26 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
         // Extract contact information from GetMonthlyContact1Result
         const resultElement = xmlDoc.getElementsByTagName('GetMonthlyContact1Result')[0];
         if (resultElement) {
+            // Debug: Log all child elements to see the actual structure
+            console.log(`🔍 GetMonthlyContact1Result child elements for contact ${contactId}:`);
+            for (let i = 0; i < resultElement.children.length; i++) {
+                const child = resultElement.children[i];
+                console.log(`  - ${child.tagName}: ${child.textContent}`);
+            }
+            
             // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
-                return element ? element.textContent || '' : '';
+                const value = element ? element.textContent || '' : '';
+                console.log(`🏷️ ${tagName}: "${value}"`);
+                return value;
+            };
+            
+            const getElementBoolean = (tagName: string) => {
+                const element = resultElement.getElementsByTagName(tagName)[0];
+                const value = element ? element.textContent?.toLowerCase() === 'true' : false;
+                console.log(`🏷️ ${tagName}: ${value} (from "${element?.textContent}")`);
+                return value;
             };
             
             const code = getElementText('Code');
@@ -549,17 +629,12 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
                 throw new Error(`API Error: ${code} - ${message}`);
             }
 
-            const getElementBoolean = (tagName: string) => {
-                const element = resultElement.getElementsByTagName(tagName)[0];
-                return element ? element.textContent?.toLowerCase() === 'true' : false;
-            };
-
-            return {
+            const contactResult = {
                 Code: getElementText('Code'),
                 Message: getElementText('Message'),
                 LocationId: getElementText('LocationId'),
                 ContactId: getElementText('ContactId'),
-                AccountNumber: getElementText('AccountNumber'),
+                AccountNumber: getElementText('MonthlyAccountNumber') || accountNumber, // Fallback to passed accountNumber
                 PrimaryContact: getElementBoolean('PrimaryContact'),
                 FirstName: getElementText('FirstName'),
                 LastName: getElementText('LastName'),
@@ -571,9 +646,12 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
                 // For backward compatibility
                 ContactGuid: contactId,
                 FlashAccountNumber: accountNumber,
-                Email: getElementText('EmailAddress'),
-                Phone: getElementText('MobileNumber')
+                Email: getElementText('EmailAddress'), // Map to backward compatibility field
+                Phone: getElementText('MobileNumber')  // Map to backward compatibility field
             };
+
+            console.log(`✅ Parsed contact result for ${contactId}:`, contactResult);
+            return contactResult;
         }
         
         return null;
@@ -794,6 +872,59 @@ async function getIntegrationMonthlyRecords(
     };
 } // <-- Add this closing brace to terminate getIntegrationMonthlyRecords
 
+// Function to deduplicate contacts based on name and account, merging data intelligently
+function deduplicateContacts(contacts: MonthlyContactResult[]): MonthlyContactResult[] {
+    const contactMap = new Map<string, MonthlyContactResult>();
+    
+    for (const contact of contacts) {
+        // Create a unique key based on First Name, Last Name, and Account Number
+        const key = `${contact.FirstName?.trim()}|${contact.LastName?.trim()}|${contact.AccountNumber?.trim()}`.toLowerCase();
+        
+        const existing = contactMap.get(key);
+        if (!existing) {
+            // First occurrence of this contact
+            contactMap.set(key, { ...contact });
+        } else {
+            // Merge duplicate contact data intelligently
+            const merged: MonthlyContactResult = {
+                ...existing,
+                // Prefer the primary contact's Contact ID and primary status
+                ContactId: existing.PrimaryContact ? existing.ContactId : contact.ContactId,
+                PrimaryContact: existing.PrimaryContact || contact.PrimaryContact,
+                
+                // Merge non-empty values, preferring the primary contact's data
+                EmailAddress: existing.PrimaryContact 
+                    ? (existing.EmailAddress || contact.EmailAddress)
+                    : (contact.EmailAddress || existing.EmailAddress),
+                    
+                MobileNumber: existing.PrimaryContact 
+                    ? (existing.MobileNumber || contact.MobileNumber)
+                    : (contact.MobileNumber || existing.MobileNumber),
+                    
+                EmployeeId: existing.PrimaryContact 
+                    ? (existing.EmployeeId || contact.EmployeeId)
+                    : (contact.EmployeeId || existing.EmployeeId),
+                    
+                CustomerBarcode: existing.PrimaryContact 
+                    ? (existing.CustomerBarcode || contact.CustomerBarcode)
+                    : (contact.CustomerBarcode || existing.CustomerBarcode),
+                    
+                RFIDNumber: existing.PrimaryContact 
+                    ? (existing.RFIDNumber || contact.RFIDNumber)
+                    : (contact.RFIDNumber || existing.RFIDNumber)
+            };
+            
+            contactMap.set(key, merged);
+            console.log(`🔄 Merged duplicate contact: ${contact.FirstName} ${contact.LastName} (Account: ${contact.AccountNumber})`);
+        }
+    }
+    
+    const deduplicatedContacts = Array.from(contactMap.values());
+    console.log(`📊 Contact deduplication: ${contacts.length} → ${deduplicatedContacts.length} contacts`);
+    
+    return deduplicatedContacts;
+}
+
 const CardAudit: React.FC = () => {
     const [soapVersion, setSoapVersion] = useState<'1.1' | '1.2'>('1.1');
     const [parcsType, setParcsType] = useState<string>('FLASH');
@@ -830,6 +961,10 @@ const CardAudit: React.FC = () => {
         fetchProfiles: false
     });
     const [profilesResult, setProfilesResult] = useState<MonthlyProfilesResult | null>(null);
+
+    // Foreign key state for linking tables
+    const [selectedAccountNumber, setSelectedAccountNumber] = useState<string | null>(null);
+    const [highlightedAccountNumber, setHighlightedAccountNumber] = useState<string | null>(null);
 
     // Location options for each PARCs type
     const parcsOptions = {
@@ -966,10 +1101,13 @@ const CardAudit: React.FC = () => {
                     }
                 }
                 
+                // Deduplicate contacts before storing
+                const deduplicatedContacts = deduplicateContacts(allContacts);
+                
                 // Store the results
                 setDetailedAccountsData(detailedAccounts);
-                setContactsData(allContacts);
-                console.log(`✅ Step 2 Complete: Fetched ${detailedAccounts.length} detailed accounts and ${allContacts.length} contacts`);
+                setContactsData(deduplicatedContacts);
+                console.log(`✅ Step 2 Complete: Fetched ${detailedAccounts.length} detailed accounts and ${allContacts.length} contacts (${deduplicatedContacts.length} after deduplication)`);
             }
             
             setIntegrationResult(null);
@@ -1336,11 +1474,52 @@ const CardAudit: React.FC = () => {
                             </Box>
                         </Stack>
 
+                        {/* Foreign Key Filter Status */}
+                        {selectedAccountNumber && (
+                            <Alert 
+                                severity="info" 
+                                sx={{ mt: 2, mb: 2 }}
+                                action={
+                                    <Button 
+                                        color="inherit" 
+                                        size="small" 
+                                        onClick={() => setSelectedAccountNumber(null)}
+                                    >
+                                        Clear Filter
+                                    </Button>
+                                }
+                            >
+                                🔗 Tables are filtered by Account Number: <strong>{selectedAccountNumber}</strong>
+                                <Box sx={{ mt: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                    <Chip 
+                                        size="small" 
+                                        label={`Basic Accounts: ${tableData.filter(row => row.accountNumber === selectedAccountNumber).length}`}
+                                        color="primary"
+                                        variant="outlined"
+                                    />
+                                    <Chip 
+                                        size="small" 
+                                        label={`Detailed Info: ${detailedAccountsData.filter(account => 
+                                            (account.MonthlyAccountNumber || account.AccountNumber) === selectedAccountNumber).length}`}
+                                        color="secondary"
+                                        variant="outlined"
+                                    />
+                                    <Chip 
+                                        size="small" 
+                                        label={`Contacts: ${contactsData.filter(contact => contact.AccountNumber === selectedAccountNumber).length}`}
+                                        color="success"
+                                        variant="outlined"
+                                    />
+                                </Box>
+                            </Alert>
+                        )}
+
                         {/* Table Section - Basic Account List */}
                         {tableData.length > 0 && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
                                     📋 Basic Account List ({tableData.length} records)
+                                    {selectedAccountNumber && ' - Click rows to filter other tables'}
                                 </Typography>
                                 <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                                     <Table stickyHeader>
@@ -1358,13 +1537,23 @@ const CardAudit: React.FC = () => {
                                             {tableData.map((row) => (
                                                 <TableRow 
                                                     key={row.id}
+                                                    onClick={() => setSelectedAccountNumber(row.accountNumber)}
+                                                    onMouseEnter={() => setHighlightedAccountNumber(row.accountNumber)}
+                                                    onMouseLeave={() => setHighlightedAccountNumber(null)}
                                                     sx={{ 
                                                         '&:nth-of-type(odd)': { backgroundColor: '#fafafa' },
-                                                        '&:hover': { backgroundColor: '#e3f2fd' }
+                                                        '&:hover': { backgroundColor: '#e3f2fd', cursor: 'pointer' },
+                                                        backgroundColor: selectedAccountNumber === row.accountNumber ? '#bbdefb' : 
+                                                                        highlightedAccountNumber === row.accountNumber ? '#e3f2fd' : undefined
                                                     }}
                                                 >
                                                     <TableCell>{row.id}</TableCell>
-                                                    <TableCell sx={{ fontWeight: 'medium' }}>{row.accountNumber}</TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontWeight: selectedAccountNumber === row.accountNumber ? 'bold' : 'medium',
+                                                        color: selectedAccountNumber === row.accountNumber ? '#1976d2' : 'inherit'
+                                                    }}>
+                                                        {row.accountNumber}
+                                                    </TableCell>
                                                     <TableCell>{row.flashAccountNumber}</TableCell>
                                                     <TableCell>
                                                         <Typography 
@@ -1402,7 +1591,20 @@ const CardAudit: React.FC = () => {
                         {detailedAccountsData.length > 0 && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
-                                    🏢 Detailed Account Information ({detailedAccountsData.length} records)
+                                    🏢 Detailed Account Information 
+                                    {selectedAccountNumber 
+                                        ? ` (Filtered by Account: ${selectedAccountNumber})` 
+                                        : ` (${detailedAccountsData.length} records)`
+                                    }
+                                    {selectedAccountNumber && (
+                                        <Button 
+                                            size="small" 
+                                            onClick={() => setSelectedAccountNumber(null)}
+                                            sx={{ ml: 2 }}
+                                        >
+                                            Clear Filter
+                                        </Button>
+                                    )}
                                 </Typography>
                                 <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
                                     <Table stickyHeader>
@@ -1422,9 +1624,25 @@ const CardAudit: React.FC = () => {
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {detailedAccountsData.map((account, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell>{account.MonthlyAccountNumber || account.AccountNumber}</TableCell>
+                                            {detailedAccountsData
+                                                .filter(account => !selectedAccountNumber || 
+                                                    (account.MonthlyAccountNumber || account.AccountNumber) === selectedAccountNumber)
+                                                .map((account, index) => (
+                                                <TableRow 
+                                                    key={index}
+                                                    sx={{
+                                                        backgroundColor: selectedAccountNumber && 
+                                                            (account.MonthlyAccountNumber || account.AccountNumber) === selectedAccountNumber 
+                                                            ? '#e8f5e8' : undefined
+                                                    }}
+                                                >
+                                                    <TableCell sx={{ 
+                                                        fontWeight: selectedAccountNumber && 
+                                                            (account.MonthlyAccountNumber || account.AccountNumber) === selectedAccountNumber 
+                                                            ? 'bold' : 'normal'
+                                                    }}>
+                                                        {account.MonthlyAccountNumber || account.AccountNumber}
+                                                    </TableCell>
                                                     <TableCell>{account.AccountType}</TableCell>
                                                     <TableCell>
                                                         <Chip 
@@ -1453,8 +1671,27 @@ const CardAudit: React.FC = () => {
                         {contactsData.length > 0 && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
-                                    👥 Contact Information ({contactsData.length} records)
+                                    👥 Contact Information 
+                                    {selectedAccountNumber 
+                                        ? ` (Filtered by Account: ${selectedAccountNumber})` 
+                                        : ` (${contactsData.length} records - duplicates merged)`
+                                    }
+                                    {selectedAccountNumber && (
+                                        <Button 
+                                            size="small" 
+                                            onClick={() => setSelectedAccountNumber(null)}
+                                            sx={{ ml: 2 }}
+                                        >
+                                            Clear Filter
+                                        </Button>
+                                    )}
                                 </Typography>
+                                {!selectedAccountNumber && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                        🔄 Duplicate contacts with the same name and account have been automatically merged, 
+                                        prioritizing primary contact data and combining RFID/credential information.
+                                    </Typography>
+                                )}
                                 <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
                                     <Table stickyHeader>
                                         <TableHead>
@@ -1472,9 +1709,22 @@ const CardAudit: React.FC = () => {
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {contactsData.map((contact, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell>{contact.AccountNumber}</TableCell>
+                                            {contactsData
+                                                .filter(contact => !selectedAccountNumber || contact.AccountNumber === selectedAccountNumber)
+                                                .map((contact, index) => (
+                                                <TableRow 
+                                                    key={index}
+                                                    sx={{
+                                                        backgroundColor: selectedAccountNumber && contact.AccountNumber === selectedAccountNumber 
+                                                            ? '#fffde7' : undefined
+                                                    }}
+                                                >
+                                                    <TableCell sx={{ 
+                                                        fontWeight: selectedAccountNumber && contact.AccountNumber === selectedAccountNumber 
+                                                            ? 'bold' : 'normal'
+                                                    }}>
+                                                        {contact.AccountNumber}
+                                                    </TableCell>
                                                     <TableCell>{contact.ContactId}</TableCell>
                                                     <TableCell>{contact.FirstName}</TableCell>
                                                     <TableCell>{contact.LastName}</TableCell>
