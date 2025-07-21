@@ -37,33 +37,81 @@ export interface ContactProfile {
 }
 
 export interface MonthlyAccountResult {
-    AccountNumber: string;
-    FlashAccountNumber: string;
-    Cars?: CarProfile[];
-    Contacts?: ContactProfile[];
-    // Add other account details as needed
+    AccountType?: string; // Monthly or Resident or Membership or Master
+    Address?: string;
+    Address2?: string;
+    AllowPassback?: boolean;
+    Cars?: string[]; // Array of car IDs
+    City?: string;
+    Code?: string; // Success or GeneralFailure or InvalidLogin or InvalidLocation or NotFound
+    CompanyCode?: string;
+    CompanyName?: string;
+    Contacts?: string[]; // Array of contact IDs
+    Department?: string;
+    LateFeeOnKiosk?: boolean;
+    LocationID?: string;
+    MasterAccountNumber?: number;
+    MembershipSetting?: string;
+    Message?: string;
+    MonthlyAccountGuid?: string;
+    MonthlyAccountNumber?: number;
+    Parks?: number;
+    PoolName?: string;
+    Profile?: string;
+    ReportGroup?: string;
+    State?: string;
+    Status?: string; // Automatic or Valid or Invalid
+    ValidUntil?: string; // dateTime
+    Zipcode?: string;
+    // For backward compatibility
+    AccountNumber?: string;
+    FlashAccountNumber?: string;
 }
 
 export interface MonthlyVehicleResult {
-    VehicleGuid: string;
-    AccountNumber: string;
-    FlashAccountNumber: string;
+    AccountNumber?: string;
+    Code?: string; // Success or GeneralFailure or InvalidLogin or InvalidLocation or NotFound
+    KeyBarcode?: string;
+    KeyHook?: string;
+    Message?: string;
+    ParkingSpot?: string;
+    RFIDNumber?: string;
+    VehicleBarcode?: string;
+    VehicleColor?: string;
+    VehicleID?: string;
+    VehicleLicenseNumber?: string;
+    VehicleLicenseState?: string;
+    VehicleMake?: string;
+    VehicleModel?: string;
+    VehicleNickname?: string;
+    // For backward compatibility
+    VehicleGuid?: string;
+    FlashAccountNumber?: string;
     LicensePlate?: string;
     Make?: string;
     Model?: string;
     Color?: string;
-    // Add other vehicle details as needed
 }
 
 export interface MonthlyContactResult {
-    ContactGuid: string;
-    AccountNumber: string;
-    FlashAccountNumber: string;
+    Code?: string; // Success or GeneralFailure or InvalidLogin or InvalidLocation or NotFound
+    Message?: string;
+    LocationId?: string;
+    ContactId?: string;
+    AccountNumber?: string;
+    PrimaryContact?: boolean;
     FirstName?: string;
     LastName?: string;
+    EmailAddress?: string;
+    MobileNumber?: string;
+    CustomerBarcode?: string;
+    RFIDNumber?: string;
+    EmployeeId?: string;
+    // For backward compatibility
+    ContactGuid?: string;
+    FlashAccountNumber?: string;
     Email?: string;
     Phone?: string;
-    // Add other contact details as needed
 }
 
 export interface MonthlyModel {

@@ -4,37 +4,93 @@
 
 The CORS issue has been **SOLVED** by implementing a backend proxy server!
 
-## How It Works
+## 🚨 IMPORTANT: URL Sharing
 
-1. **Development**: Vite dev server with proxy
-2. **Production**: Express.js server that serves the built files AND proxies SOAP requests
+**❌ WRONG - Don't share this:**
+```
+http://localhost:3000
+```
+This only works on YOUR computer!
 
-## New Architecture
+**✅ CORRECT - Share this instead:**
+```
+https://your-app-name.onrender.com
+```
+Get this URL from your Render dashboard after deployment.
+
+## Step-by-Step Render Deployment
+
+### 1. **Create Render Account & Connect Repository**
+1. Go to [render.com](https://render.com)
+2. Sign up/Login with GitHub
+3. Click "New" → "Web Service"
+4. Connect your `Parker-Card-Audit` repository
+
+### 2. **Configure Build Settings**
+- **Name**: `parker-card-audit` (or your preferred name)
+- **Environment**: `Node.js`
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `npm start`
+- **Instance Type**: Free
+
+### 3. **Deploy & Get Public URL**
+1. Click "Create Web Service"
+2. Wait for build to complete (5-10 minutes)
+3. Your app will be available at: `https://parker-card-audit.onrender.com`
+4. **Share THIS URL** with others, not localhost!
+
+## Troubleshooting "Site Can't Be Reached"
+
+### ❌ Problem: Users getting "localhost refused to connect"
+**Cause**: You're sharing localhost URL instead of Render URL
+
+**Solution**: 
+1. Check your Render dashboard for the public URL
+2. Share the `.onrender.com` URL instead
+3. Make sure deployment is complete and shows "Live"
+
+### ❌ Problem: Render build failing
+**Cause**: Build errors or wrong configuration
+
+**Solution**:
+- Check build logs in Render dashboard
+- Ensure these exact settings:
+  - Build Command: `npm install && npm run build`
+  - Start Command: `npm start`
+  - Environment: Node.js
+
+### ❌ Problem: App loads but SOAP requests fail
+**Cause**: Proxy server not working properly
+
+**Solution**:
+- Check server logs in Render dashboard
+- Look for proxy request logs
+- Verify Azure endpoint is accessible
+
+## How to Share Your App Correctly
+
+1. **Check Deployment Status**:
+   - Go to Render dashboard
+   - Ensure your service shows "Live" status
+   - Note the public URL (something like `https://parker-card-audit.onrender.com`)
+
+2. **Test the Public URL**:
+   - Open the Render URL in your browser
+   - Verify the environment panel shows "Production (Express)"
+   - Test a SOAP request to ensure proxy works
+
+3. **Share the Correct URL**:
+   - ✅ Share: `https://your-app-name.onrender.com`
+   - ❌ Don't share: `http://localhost:3000`
+
+## Architecture Overview
 
 ```
-Your Browser → Render (Express Server) → Azure SOAP Endpoint
+User's Browser → Render (Express Server) → Azure SOAP Endpoint
 ```
 
-The Express server acts as a middle layer that:
-- Serves your React app
-- Proxies SOAP requests to avoid CORS issues
-- Adds proper headers and handles preflight requests
-
-## Render Build Configuration
-
-**Build Command:**
-```bash
-npm install && npm run build
-```
-
-**Start Command:**
-```bash
-npm start
-```
-
-**Environment:**
-- **Node.js** (not Static Site)
-- Auto-deploy from Git: ✅
+- **Development**: `http://localhost:3000` (only on your machine)
+- **Production**: `https://your-app.onrender.com` (accessible worldwide)
 
 ## Build Process
 

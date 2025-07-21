@@ -158,10 +158,42 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
 </soap12:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, 'http://kleverlogic.com/webservices/GetAllMonthlies', soapBody, soapVersion);
+        // Debug: Log raw SOAP response for GetAllMonthlies
+        console.log('🧾 Raw SOAP response for GetAllMonthlies:', response);
         
         // Parse the response and extract accounts
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
+        
+        // Check for SOAP faults first
+        const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
+        if (faultElements.length > 0) {
+            const faultString = faultElements[0].getElementsByTagName('faultstring')[0]?.textContent || 'Unknown SOAP fault';
+            console.error(`❌ SOAP Fault in GetAllMonthlies: ${faultString}`);
+            throw new Error(`SOAP Fault: ${faultString}`);
+        }
+        
+        // Check for GetAllMonthliesResult and any error messages
+        const resultElement = xmlDoc.getElementsByTagName('GetAllMonthliesResult')[0];
+        if (resultElement) {
+            // Check if there's an error message in the result
+            const messageElement = resultElement.getElementsByTagName('Message')[0];
+            const codeElement = resultElement.getElementsByTagName('Code')[0];
+            
+            if (messageElement || codeElement) {
+                const message = messageElement?.textContent || '';
+                const code = codeElement?.textContent || '';
+                console.log(`📋 GetAllMonthlies Result - Code: ${code}, Message: ${message}`);
+                
+                if (code && code !== 'Success') {
+                    console.error(`❌ GetAllMonthlies Error - Code: ${code}, Message: ${message}`);
+                    if (code === 'InvalidLogin' || message.toLowerCase().includes('invalid login')) {
+                        throw new Error(`Authentication Error: ${message || 'Invalid login credentials'}`);
+                    }
+                    throw new Error(`API Error: ${code} - ${message}`);
+                }
+            }
+        }
         
         // Look for MonthlyAccountLite elements
         const accounts = xmlDoc.getElementsByTagName('MonthlyAccountLite');
@@ -215,58 +247,106 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
 </soap12:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_ACCOUNT_ACTION, soapBody, soapVersion);
+        // Debug: Log raw SOAP response for GetMonthlyAccount
+        console.log(`🧾 Raw SOAP response for GetMonthlyAccount (${flashAccountNumber}):`, response);
         
         // Parse the response and extract account details
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
-        // Extract account information (adapt based on actual API response structure)
-        const accountElement = xmlDoc.getElementsByTagName('MonthlyAccount')[0];
-        if (accountElement) {
+        // Check for SOAP faults first
+        const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
+        if (faultElements.length > 0) {
+            const faultString = faultElements[0].getElementsByTagName('faultstring')[0]?.textContent || 'Unknown SOAP fault';
+            console.error(`❌ SOAP Fault in GetMonthlyAccount: ${faultString}`);
+            throw new Error(`SOAP Fault: ${faultString}`);
+        }
+        
+        // Extract account information from GetMonthlyAccountResult
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyAccountResult')[0];
+        if (resultElement) {
+            // Check for error codes in the result
             const getElementText = (tagName: string) => {
-                const element = accountElement.getElementsByTagName(tagName)[0];
+                const element = resultElement.getElementsByTagName(tagName)[0];
                 return element ? element.textContent || '' : '';
             };
+            
+            const code = getElementText('Code');
+            const message = getElementText('Message');
+            
+            console.log(`📋 GetMonthlyAccount Result - Code: ${code}, Message: ${message}`);
+            
+            // Check if the response indicates an error
+            if (code && code !== 'Success') {
+                console.error(`❌ GetMonthlyAccount Error - Code: ${code}, Message: ${message}`);
+                if (code === 'InvalidLogin' || message.toLowerCase().includes('invalid login')) {
+                    throw new Error(`Authentication Error: ${message || 'Invalid login credentials'}`);
+                }
+                throw new Error(`API Error: ${code} - ${message}`);
+            }
 
-            // Extract cars/vehicles from the account
-            const carsElements = accountElement.getElementsByTagName('Car') || accountElement.getElementsByTagName('Vehicle');
-            const cars: CarProfile[] = Array.from(carsElements).map((carElement, index) => {
-                const getCarElementText = (tagName: string) => {
-                    const element = carElement.getElementsByTagName(tagName)[0];
-                    return element ? element.textContent || '' : '';
-                };
-                
-                return {
-                    VehicleGuid: getCarElementText('VehicleGuid') || getCarElementText('vehicleId') || `vehicle_${index}`,
-                    LicensePlate: getCarElementText('LicensePlate') || getCarElementText('vehicleLicenseNumber'),
-                    Make: getCarElementText('Make') || getCarElementText('vehicleMake'),
-                    Model: getCarElementText('Model') || getCarElementText('vehicleModel'),
-                    Color: getCarElementText('Color') || getCarElementText('vehicleColor'),
-                };
-            });
+            const getElementBoolean = (tagName: string) => {
+                const element = resultElement.getElementsByTagName(tagName)[0];
+                return element ? element.textContent?.toLowerCase() === 'true' : false;
+            };
 
-            // Extract contacts from the account
-            const contactsElements = accountElement.getElementsByTagName('Contact');
-            const contacts: ContactProfile[] = Array.from(contactsElements).map((contactElement, index) => {
-                const getContactElementText = (tagName: string) => {
-                    const element = contactElement.getElementsByTagName(tagName)[0];
-                    return element ? element.textContent || '' : '';
-                };
-                
-                return {
-                    ContactGuid: getContactElementText('ContactGuid') || getContactElementText('contactId') || `contact_${index}`,
-                    FirstName: getContactElementText('FirstName'),
-                    LastName: getContactElementText('LastName'),
-                    Email: getContactElementText('Email'),
-                    Phone: getContactElementText('Phone'),
-                };
-            });
+            const getElementNumber = (tagName: string) => {
+                const element = resultElement.getElementsByTagName(tagName)[0];
+                return element ? parseInt(element.textContent || '0', 10) : 0;
+            };
+
+            // Extract Cars array
+            const carsElement = resultElement.getElementsByTagName('Cars')[0];
+            const cars: string[] = [];
+            if (carsElement) {
+                const stringElements = carsElement.getElementsByTagName('string');
+                for (let i = 0; i < stringElements.length; i++) {
+                    const carId = stringElements[i].textContent;
+                    if (carId) cars.push(carId);
+                }
+            }
+
+            // Extract Contacts array
+            const contactsElement = resultElement.getElementsByTagName('Contacts')[0];
+            const contacts: string[] = [];
+            if (contactsElement) {
+                const stringElements = contactsElement.getElementsByTagName('string');
+                for (let i = 0; i < stringElements.length; i++) {
+                    const contactId = stringElements[i].textContent;
+                    if (contactId) contacts.push(contactId);
+                }
+            }
 
             return {
-                AccountNumber: getElementText('AccountNumber'),
-                FlashAccountNumber: flashAccountNumber,
+                AccountType: getElementText('AccountType'),
+                Address: getElementText('Address'),
+                Address2: getElementText('Address2'),
+                AllowPassback: getElementBoolean('AllowPassback'),
                 Cars: cars,
+                City: getElementText('City'),
+                Code: getElementText('Code'),
+                CompanyCode: getElementText('CompanyCode'),
+                CompanyName: getElementText('CompanyName'),
                 Contacts: contacts,
+                Department: getElementText('Department'),
+                LateFeeOnKiosk: getElementBoolean('LateFeeOnKiosk'),
+                LocationID: getElementText('LocationID'),
+                MasterAccountNumber: getElementNumber('MasterAccountNumber'),
+                MembershipSetting: getElementText('MembershipSetting'),
+                Message: getElementText('Message'),
+                MonthlyAccountGuid: getElementText('MonthlyAccountGuid'),
+                MonthlyAccountNumber: getElementNumber('MonthlyAccountNumber'),
+                Parks: getElementNumber('Parks'),
+                PoolName: getElementText('PoolName'),
+                Profile: getElementText('Profile'),
+                ReportGroup: getElementText('ReportGroup'),
+                State: getElementText('State'),
+                Status: getElementText('Status'),
+                ValidUntil: getElementText('ValidUntil'),
+                Zipcode: getElementText('Zipcode'),
+                // For backward compatibility
+                AccountNumber: getElementText('MonthlyAccountNumber') || flashAccountNumber,
+                FlashAccountNumber: flashAccountNumber
             };
         }
         
@@ -310,22 +390,37 @@ async function getMonthlyVehicle(securityToken: string, locationId: string, vehi
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
-        // Extract vehicle information (adapt based on actual API response structure)
-        const vehicleElement = xmlDoc.getElementsByTagName('MonthlyVehicle')[0] || xmlDoc.getElementsByTagName('Vehicle')[0];
-        if (vehicleElement) {
+        // Extract vehicle information from GetMonthlyVehicleResult
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyVehicleResult')[0];
+        if (resultElement) {
             const getElementText = (tagName: string) => {
-                const element = vehicleElement.getElementsByTagName(tagName)[0];
+                const element = resultElement.getElementsByTagName(tagName)[0];
                 return element ? element.textContent || '' : '';
             };
 
             return {
+                AccountNumber: getElementText('AccountNumber'),
+                Code: getElementText('Code'),
+                KeyBarcode: getElementText('KeyBarcode'),
+                KeyHook: getElementText('KeyHook'),
+                Message: getElementText('Message'),
+                ParkingSpot: getElementText('ParkingSpot'),
+                RFIDNumber: getElementText('RFIDNumber'),
+                VehicleBarcode: getElementText('VehicleBarcode'),
+                VehicleColor: getElementText('VehicleColor'),
+                VehicleID: getElementText('VehicleID'),
+                VehicleLicenseNumber: getElementText('VehicleLicenseNumber'),
+                VehicleLicenseState: getElementText('VehicleLicenseState'),
+                VehicleMake: getElementText('VehicleMake'),
+                VehicleModel: getElementText('VehicleModel'),
+                VehicleNickname: getElementText('VehicleNickname'),
+                // For backward compatibility
                 VehicleGuid: vehicleId,
-                AccountNumber: accountNumber,
-                FlashAccountNumber: accountNumber, // Assuming they're the same for now
-                LicensePlate: getElementText('vehicleLicenseNumber') || getElementText('LicensePlate'),
-                Make: getElementText('vehicleMake') || getElementText('Make'),
-                Model: getElementText('vehicleModel') || getElementText('Model'),
-                Color: getElementText('vehicleColor') || getElementText('Color'),
+                FlashAccountNumber: accountNumber,
+                LicensePlate: getElementText('VehicleLicenseNumber'),
+                Make: getElementText('VehicleMake'),
+                Model: getElementText('VehicleModel'),
+                Color: getElementText('VehicleColor')
             };
         }
         
@@ -369,22 +464,38 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
-        // Extract contact information (adapt based on actual API response structure)
-        const contactElement = xmlDoc.getElementsByTagName('MonthlyContact')[0] || xmlDoc.getElementsByTagName('Contact')[0];
-        if (contactElement) {
+        // Extract contact information from GetMonthlyContactResult
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyContactResult')[0];
+        if (resultElement) {
             const getElementText = (tagName: string) => {
-                const element = contactElement.getElementsByTagName(tagName)[0];
+                const element = resultElement.getElementsByTagName(tagName)[0];
                 return element ? element.textContent || '' : '';
             };
 
+            const getElementBoolean = (tagName: string) => {
+                const element = resultElement.getElementsByTagName(tagName)[0];
+                return element ? element.textContent?.toLowerCase() === 'true' : false;
+            };
+
             return {
-                ContactGuid: contactId,
-                AccountNumber: accountNumber,
-                FlashAccountNumber: accountNumber, // Assuming they're the same for now
+                Code: getElementText('Code'),
+                Message: getElementText('Message'),
+                LocationId: getElementText('LocationId'),
+                ContactId: getElementText('ContactId'),
+                AccountNumber: getElementText('AccountNumber'),
+                PrimaryContact: getElementBoolean('PrimaryContact'),
                 FirstName: getElementText('FirstName'),
                 LastName: getElementText('LastName'),
-                Email: getElementText('Email'),
-                Phone: getElementText('Phone'),
+                EmailAddress: getElementText('EmailAddress'),
+                MobileNumber: getElementText('MobileNumber'),
+                CustomerBarcode: getElementText('CustomerBarcode'),
+                RFIDNumber: getElementText('RFIDNumber'),
+                EmployeeId: getElementText('EmployeeId'),
+                // For backward compatibility
+                ContactGuid: contactId,
+                FlashAccountNumber: accountNumber,
+                Email: getElementText('EmailAddress'),
+                Phone: getElementText('MobileNumber')
             };
         }
         
@@ -499,60 +610,75 @@ async function getIntegrationMonthlyRecords(
                         Status: account.Status
                     };
                     
-                    // Only process Valid accounts (similar to C# STATUS__VALID check)
-                    if (account.Status.toUpperCase() === 'VALID') {
-                        // Get detailed account information
-                        const monthlyAccount = await getMonthlyAccount(
-                            securityToken, 
-                            locationId, 
-                            account.FlashAccountNumber, 
-                            soapVersion
-                        );
+                    // Get detailed account information for ALL accounts (not just valid ones)
+                    const monthlyAccount = await getMonthlyAccount(
+                        securityToken, 
+                        locationId, 
+                        account.FlashAccountNumber, 
+                        soapVersion
+                    );
+                    
+                    if (monthlyAccount) {
+                        monthly.Account = monthlyAccount;
+                        console.log(`✅ Successfully fetched account details for ${account.FlashAccountNumber}:`, monthlyAccount);
+                        console.log(`📋 Cars array:`, monthlyAccount.Cars);
+                        console.log(`📋 Contacts array:`, monthlyAccount.Contacts);
                         
-                        if (monthlyAccount) {
-                            monthly.Account = monthlyAccount;
-                            
-                            // Process vehicles if account has cars
-                            const monthlyVehicles: MonthlyVehicleResult[] = [];
-                            if (monthly.Account?.Cars?.length) {
-                                for (const car of monthly.Account.Cars) {
-                                    const vehicle = await getMonthlyVehicle(
-                                        securityToken,
-                                        locationId,
-                                        car.VehicleGuid,
-                                        account.AccountNumber,
-                                        soapVersion
-                                    );
-                                    if (vehicle) {
-                                        monthlyVehicles.push(vehicle);
-                                    }
+                        // Process vehicles if account has cars
+                        const monthlyVehicles: MonthlyVehicleResult[] = [];
+                        if (monthly.Account?.Cars?.length) {
+                            console.log(`🚗 Processing ${monthly.Account.Cars.length} vehicles for account ${account.FlashAccountNumber}`);
+                            for (const carId of monthly.Account.Cars) {
+                                console.log(`🚗 Fetching vehicle details for carId: ${carId}`);
+                                const vehicle = await getMonthlyVehicle(
+                                    securityToken,
+                                    locationId,
+                                    carId,
+                                    account.AccountNumber,
+                                    soapVersion
+                                );
+                                if (vehicle) {
+                                    monthlyVehicles.push(vehicle);
+                                    console.log(`✅ Processed vehicle: ${vehicle.VehicleLicenseNumber} for account: ${account.AccountNumber}`);
+                                } else {
+                                    console.log(`❌ No vehicle data returned for carId: ${carId}`);
                                 }
                             }
-                            monthly.Vehicles = monthlyVehicles;
-
-                            // Process contacts if account has contacts
-                            const monthlyContacts: MonthlyContactResult[] = [];
-                            if (monthly.Account?.Contacts?.length) {
-                                for (const contact of monthly.Account.Contacts) {
-                                    const contactResult = await getMonthlyContact(
-                                        securityToken,
-                                        locationId,
-                                        contact.ContactGuid,
-                                        account.AccountNumber,
-                                        soapVersion
-                                    );
-                                    if (contactResult) {
-                                        monthlyContacts.push(contactResult);
-                                    }
-                                }
-                            }
-                            monthly.Contacts = monthlyContacts;
+                        } else {
+                            console.log(`⚠️ No cars found for account ${account.FlashAccountNumber}`);
                         }
-                        
-                        monthlies.push(monthly);
+                        monthly.Vehicles = monthlyVehicles;
+
+                        // Process contacts if account has contacts
+                        const monthlyContacts: MonthlyContactResult[] = [];
+                        if (monthly.Account?.Contacts?.length) {
+                            console.log(`👥 Processing ${monthly.Account.Contacts.length} contacts for account ${account.FlashAccountNumber}`);
+                            for (const contactId of monthly.Account.Contacts) {
+                                console.log(`👥 Fetching contact details for contactId: ${contactId}`);
+                                const contactResult = await getMonthlyContact(
+                                    securityToken,
+                                    locationId,
+                                    contactId,
+                                    account.AccountNumber,
+                                    soapVersion
+                                );
+                                if (contactResult) {
+                                    monthlyContacts.push(contactResult);
+                                    console.log(`✅ Processed contact: ${contactResult.FirstName} ${contactResult.LastName} for account: ${account.AccountNumber}`);
+                                } else {
+                                    console.log(`❌ No contact data returned for contactId: ${contactId}`);
+                                }
+                            }
+                        } else {
+                            console.log(`⚠️ No contacts found for account ${account.FlashAccountNumber}`);
+                        }
+                        monthly.Contacts = monthlyContacts;
                     } else {
-                        errorAccounts.push(monthly);
+                        console.log(`❌ No account details returned for ${account.FlashAccountNumber}`);
                     }
+                    
+                    // Add to successful monthlies regardless of status
+                    monthlies.push(monthly);
                     
                     processed++;
                     onProgress?.(processed, total);
@@ -589,7 +715,7 @@ async function getIntegrationMonthlyRecords(
             ProcessingTimeMs: endTime - startTime
         }
     };
-}
+} // <-- Add this closing brace to terminate getIntegrationMonthlyRecords
 
 const CardAudit: React.FC = () => {
     const [soapVersion, setSoapVersion] = useState<'1.1' | '1.2'>('1.1');
@@ -610,20 +736,22 @@ const CardAudit: React.FC = () => {
     const [tableData, setTableData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     
+    // New state for the three-table system
+    const [detailedAccountsData, setDetailedAccountsData] = useState<MonthlyAccountResult[]>([]);
+    const [contactsData, setContactsData] = useState<MonthlyContactResult[]>([]);
+    
     // Integration processing state
     const [integrationResult, setIntegrationResult] = useState<IntegrationResult | null>(null);
     const [isProcessingIntegration, setIsProcessingIntegration] = useState(false);
     const [processingProgress, setProcessingProgress] = useState({ current: 0, total: 0 });
     const [rawAccounts, setRawAccounts] = useState<MonthlyAccountLite[]>([]);
 
-    // API method selection state
-    const [apiMethod, setApiMethod] = useState<'GetAllMonthlies' | 'GetMonthlyAccount' | 'GetMonthlyProfiles'>('GetAllMonthlies');
+    // API processing state - simplified since we always do the same process
     const [integrationOptions, setIntegrationOptions] = useState({
         fetchVehicles: true,
         fetchContacts: true,
         fetchProfiles: false
     });
-    const [singleAccountNumber, setSingleAccountNumber] = useState<string>('');
     const [profilesResult, setProfilesResult] = useState<MonthlyProfilesResult | null>(null);
 
     // Location options for each PARCs type
@@ -679,97 +807,95 @@ const CardAudit: React.FC = () => {
         setData(null);
         
         try {
-            console.log(`🚀 Starting ${apiMethod} request...`);
+            console.log(`🚀 Starting complete account processing...`);
             
-            switch (apiMethod) {
-                case 'GetAllMonthlies': {
-                    console.log('📋 Fetching all monthly accounts...', formData);
-                    const accounts = await getAllMonthlies(formData.securityToken, formData.locationId, formData, soapVersion);
-                    
-                    setRawAccounts(accounts);
-                    setTableData(accounts.map((account, index) => ({
-                        id: index + 1,
-                        accountNumber: account.AccountNumber,
-                        status: account.Status,
-                        flashAccountNumber: account.FlashAccountNumber,
-                        deleted: account.Deleted,
-                        monthlyAccountType: account.MonthlyAccountType,
-                    })));
-                    console.log(`✅ Fetched ${accounts.length} accounts successfully`);
-                    setIntegrationResult(null);
-                    setProfilesResult(null);
-                    break;
-                }
+            // Step 1: Always start with GetAllMonthlies
+            console.log('📋 Step 1: Fetching all monthly accounts...', formData);
+            const accounts = await getAllMonthlies(formData.securityToken, formData.locationId, formData, soapVersion);
+            
+            setRawAccounts(accounts);
+            setTableData(accounts.map((account, index) => ({
+                id: index + 1,
+                accountNumber: account.AccountNumber,
+                status: account.Status,
+                flashAccountNumber: account.FlashAccountNumber,
+                deleted: account.Deleted,
+                monthlyAccountType: account.MonthlyAccountType,
+            })));
+            console.log(`✅ Step 1 Complete: Fetched ${accounts.length} accounts successfully`);
+            
+            if (accounts.length > 0) {
+                // Step 2: For each account, get detailed account information and contacts
+                console.log('📋 Step 2: Fetching detailed account information and contacts...');
+                const detailedAccounts: MonthlyAccountResult[] = [];
+                const allContacts: MonthlyContactResult[] = [];
+                let processedCount = 0;
                 
-                case 'GetMonthlyAccount': {
-                    console.log('🔍 Fetching single monthly account...', { 
-                        securityToken: formData.securityToken, 
-                        locationId: formData.locationId, 
-                        accountNumber: singleAccountNumber 
-                    });
-                    
-                    const result = await getMonthlyAccount(formData.securityToken, formData.locationId, singleAccountNumber, soapVersion);
-                    
-                    if (result) {
-                        // Convert single account to array format for consistency
-                        const accountArray: MonthlyAccountLite[] = [{
-                            AccountNumber: result.AccountNumber,
-                            FlashAccountNumber: result.FlashAccountNumber,
-                            Status: 'Active', // Default since MonthlyAccountResult doesn't have Status
-                            IsDeleted: false,
-                            Deleted: 'false',
-                            MonthlyAccountType: 'Monthly', // Default type
-                        }];
+                for (const account of accounts) {
+                    try {
+                        console.log(`🔍 Processing account ${processedCount + 1}/${accounts.length}: ${account.FlashAccountNumber}`);
                         
-                        setRawAccounts(accountArray);
-                        setTableData(accountArray.map((account, index) => ({
-                            id: index + 1,
-                            accountNumber: account.AccountNumber,
-                            status: account.Status,
-                            flashAccountNumber: account.FlashAccountNumber,
-                            deleted: account.Deleted,
-                            monthlyAccountType: account.MonthlyAccountType,
-                        })));
-                        console.log(`✅ Fetched 1 account successfully`);
-                    } else {
-                        setRawAccounts([]);
-                        setTableData([]);
-                        console.log('⚠️ No account returned');
+                        // Get detailed account information
+                        const accountDetails = await getMonthlyAccount(
+                            formData.securityToken, 
+                            formData.locationId, 
+                            account.FlashAccountNumber, 
+                            soapVersion
+                        );
+                        
+                        if (accountDetails) {
+                            detailedAccounts.push(accountDetails);
+                            console.log(`✅ Account details fetched for ${account.FlashAccountNumber}`);
+                            
+                            // Get contacts for this account (if any)
+                            if (accountDetails.Contacts && accountDetails.Contacts.length > 0) {
+                                console.log(`👥 Fetching ${accountDetails.Contacts.length} contacts for account ${account.FlashAccountNumber}`);
+                                
+                                for (const contactId of accountDetails.Contacts) {
+                                    const contactDetails = await getMonthlyContact(
+                                        formData.securityToken,
+                                        formData.locationId,
+                                        contactId,
+                                        account.AccountNumber,
+                                        soapVersion
+                                    );
+                                    
+                                    if (contactDetails) {
+                                        allContacts.push(contactDetails);
+                                        console.log(`✅ Contact details fetched: ${contactDetails.FirstName} ${contactDetails.LastName}`);
+                                    }
+                                }
+                            } else {
+                                console.log(`⚠️ No contacts found for account ${account.FlashAccountNumber}`);
+                            }
+                        } else {
+                            console.log(`❌ Failed to fetch account details for ${account.FlashAccountNumber}`);
+                            console.log('securityToken:', formData.securityToken);
+                        }
+                        
+                        processedCount++;
+                        
+                    } catch (error) {
+                        console.error(`❌ Error processing account ${account.FlashAccountNumber}:`, error);
+                        processedCount++;
                     }
-                    setIntegrationResult(null);
-                    setProfilesResult(null);
-                    break;
                 }
                 
-                case 'GetMonthlyProfiles': {
-                    console.log('📋 Fetching monthly profiles...', { 
-                        securityToken: formData.securityToken, 
-                        locationId: formData.locationId 
-                    });
-                    
-                    const profiles = await getMonthlyProfiles(formData.securityToken, formData.locationId, soapVersion);
-                    
-                    if (profiles) {
-                        setProfilesResult(profiles);
-                        console.log(`✅ Fetched ${profiles.LocationProfiles.length} profiles successfully`);
-                    } else {
-                        setProfilesResult(null);
-                        console.log('⚠️ No profiles returned');
-                    }
-                    setRawAccounts([]);
-                    setIntegrationResult(null);
-                    setTableData([]);
-                    break;
-                }
-                
-                default:
-                    throw new Error(`Unknown API method: ${apiMethod}`);
+                // Store the results
+                setDetailedAccountsData(detailedAccounts);
+                setContactsData(allContacts);
+                console.log(`✅ Step 2 Complete: Fetched ${detailedAccounts.length} detailed accounts and ${allContacts.length} contacts`);
             }
             
+            setIntegrationResult(null);
+            setProfilesResult(null);
+            
         } catch (err) {
-            console.error(`❌ Error in ${apiMethod}:`, err);
-            setData(`Error: ${err instanceof Error ? err.message : `Failed to fetch ${apiMethod} data`}`);
+            console.error(`❌ Error in account processing:`, err);
+            setData(`Error: ${err instanceof Error ? err.message : `Failed to process account data`}`);
             setRawAccounts([]);
+            setDetailedAccountsData([]);
+            setContactsData([]);
             setIntegrationResult(null);
             setProfilesResult(null);
             setTableData([]);
@@ -818,6 +944,10 @@ const CardAudit: React.FC = () => {
             
             setIntegrationResult(result);
             console.log('Integration processing completed:', result);
+            // Debug: Log all account data to inspect AccountNumber issue
+            if (result && result.Monthlies) {
+                console.log('🔎 All processed account data:', JSON.stringify(result.Monthlies, null, 2));
+            }
         } catch (error) {
             console.error('Error processing integration:', error);
             alert('Error processing integration. Please check the console for details.');
@@ -833,7 +963,7 @@ const CardAudit: React.FC = () => {
                     minHeight: '100vh',
                     width: '100%',
                     background: 'linear-gradient(135deg, #1976d2 0%, #2196f3 100%)',
-                    padding: { xs: 2, md: 3 },
+                    padding: { xs: 2, md: 3 }
                 }}>
                 
                 <Card sx={{ 
@@ -851,13 +981,41 @@ const CardAudit: React.FC = () => {
                         
                         {/* Environment Info Panel */}
                         <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'medium', color: '#1565c0' }}>
-                                🌐 Mode: {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Development (Vite)' : 'Production (Express)'}
-                                &nbsp;|&nbsp;
-                                📡 SOAP Endpoint: {SOAP_ENDPOINT} → https://int1aa.azurewebsites.net
-                                &nbsp;|&nbsp;
-                                🔧 SOAP Version: {soapVersion}
-                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: '#1565c0' }}>
+                                    🌐 Mode: {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Development (Vite)' : 'Production (Express)'}
+                                    &nbsp;|&nbsp;
+                                    📡 SOAP Endpoint: {SOAP_ENDPOINT} → https://int1aa.azurewebsites.net
+                                    &nbsp;|&nbsp;
+                                    🔧 SOAP Version: {soapVersion}
+                                </Typography>
+                                
+                                {/* Share URL Button */}
+                                {window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => {
+                                            const url = window.location.origin;
+                                            navigator.clipboard.writeText(url).then(() => {
+                                                alert(`✅ Copied to clipboard!\n\nShare this URL:\n${url}`);
+                                            }).catch(() => {
+                                                prompt('Copy this URL to share with others:', url);
+                                            });
+                                        }}
+                                        sx={{ ml: 2, fontSize: '0.75rem' }}
+                                    >
+                                        📋 Copy Share URL
+                                    </Button>
+                                )}
+                                
+                                {/* Development Warning */}
+                                {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+                                    <Typography variant="caption" sx={{ color: '#f57c00', fontWeight: 'bold' }}>
+                                        ⚠️ This is localhost - only you can access it!
+                                    </Typography>
+                                )}
+                            </Stack>
                         </Box>
                         
                         {/* SOAP Version Selection */}
@@ -911,37 +1069,27 @@ const CardAudit: React.FC = () => {
                                     </Typography>
                                 </Grid>
                                 <Grid size={3}>
-                                    <FormControl variant="outlined" sx={{ minWidth: 200 }}>
-                                        <InputLabel>API Method</InputLabel>
-                                        <Select
-                                            value={apiMethod}
-                                            onChange={(e) => setApiMethod(e.target.value as 'GetAllMonthlies' | 'GetMonthlyAccount' | 'GetMonthlyProfiles')}
-                                            label="API Method"
-                                        >
-                                            <MenuItem value="GetAllMonthlies">Get All Monthlies</MenuItem>
-                                            <MenuItem value="GetMonthlyAccount">Get Monthly Account</MenuItem>
-                                            <MenuItem value="GetMonthlyProfiles">Get Monthly Profiles</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                    <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                                        {apiMethod === 'GetAllMonthlies' && 'Bulk account retrieval'}
-                                        {apiMethod === 'GetMonthlyAccount' && 'Single account lookup'}
-                                        {apiMethod === 'GetMonthlyProfiles' && 'Location profiles'}
-                                    </Typography>
-                                </Grid>
-                                <Grid size={3}>
                                     <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', fontWeight: 'medium' }}>
-                                        Integration Options:
+                                        Processing Options:
                                     </Typography>
                                     <Stack direction="column" spacing={0.5}>
                                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                             <input 
                                                 type="checkbox" 
-                                                checked={integrationOptions.fetchVehicles}
-                                                onChange={(e) => setIntegrationOptions(prev => ({...prev, fetchVehicles: e.target.checked}))}
+                                                checked={true}
+                                                disabled={true}
                                                 style={{ marginRight: 4 }}
                                             />
-                                            <Typography variant="caption">Fetch Vehicles</Typography>
+                                            <Typography variant="caption">Fetch All Accounts</Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={true}
+                                                disabled={true}
+                                                style={{ marginRight: 4 }}
+                                            />
+                                            <Typography variant="caption">Fetch Account Details</Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                             <input 
@@ -951,15 +1099,6 @@ const CardAudit: React.FC = () => {
                                                 style={{ marginRight: 4 }}
                                             />
                                             <Typography variant="caption">Fetch Contacts</Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={integrationOptions.fetchProfiles}
-                                                onChange={(e) => setIntegrationOptions(prev => ({...prev, fetchProfiles: e.target.checked}))}
-                                                style={{ marginRight: 4 }}
-                                            />
-                                            <Typography variant="caption">Fetch Profiles</Typography>
                                         </Box>
                                     </Stack>
                                 </Grid>
@@ -973,9 +1112,7 @@ const CardAudit: React.FC = () => {
                                     <Grid size={3}>
                                         <Typography variant="h6">Request Parameters</Typography>
                                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                            {apiMethod === 'GetAllMonthlies' && 'Bulk account retrieval with filters'}
-                                            {apiMethod === 'GetMonthlyAccount' && 'Single account lookup'}
-                                            {apiMethod === 'GetMonthlyProfiles' && 'Location profile information'}
+                                            Complete account processing with detailed information and contacts
                                         </Typography>
                                     </Grid>
                                     <Grid size={9}>
@@ -998,33 +1135,20 @@ const CardAudit: React.FC = () => {
                                                 variant="outlined"
                                                 required
                                             />
-                                            {apiMethod === 'GetMonthlyAccount' && (
-                                                <TextField
-                                                    fullWidth
-                                                    label="Flash Account Number"
-                                                    value={singleAccountNumber}
-                                                    onChange={(e) => setSingleAccountNumber(e.target.value)}
-                                                    variant="outlined"
-                                                    required
-                                                />
-                                            )}
-                                            {apiMethod === 'GetAllMonthlies' && (
-                                                <TextField
-                                                    fullWidth
-                                                    label="Credential Number"
-                                                    value={formData.CredentialNumber}
-                                                    onChange={handleInputChange('CredentialNumber')}
-                                                    variant="outlined"
-                                                />
-                                            )}
+                                            <TextField
+                                                fullWidth
+                                                label="Credential Number"
+                                                value={formData.CredentialNumber}
+                                                onChange={handleInputChange('CredentialNumber')}
+                                                variant="outlined"
+                                            />
                                         </Stack>
                                     </Grid> 
                                 </Grid>
                                 
-                                {apiMethod === 'GetAllMonthlies' && (
-                                    <>
-                                        <Divider variant="middle" sx={{ borderColor: '#B20838', my: 2 }} />
-                                        <Grid container spacing={1} px={3} mb={3}>
+                                {/* Always show GetAllMonthlies filters */}
+                                <Divider variant="middle" sx={{ borderColor: '#B20838', my: 2 }} />
+                                <Grid container spacing={1} px={3} mb={3}>
                                             <Grid size={3}>
                                                 <Typography variant="h6">Request Filters</Typography>
                                             </Grid>
@@ -1090,8 +1214,6 @@ const CardAudit: React.FC = () => {
                                                 </Stack>
                                             </Grid>
                                         </Grid>
-                                    </>
-                                )}
                             </Box>
 
                             
@@ -1101,14 +1223,13 @@ const CardAudit: React.FC = () => {
                                     variant="contained"
                                     color="primary"
                                     onClick={handleFetchData}
-                                    disabled={loading || !formData.securityToken || !formData.locationId || (apiMethod === 'GetMonthlyAccount' && !singleAccountNumber)}
+                                    disabled={loading || !formData.securityToken || !formData.locationId}
                                     sx={{ mr: 2 }}
                                 >
-                                    {loading ? 'Loading...' : `Fetch ${apiMethod}`}
+                                    {loading ? 'Loading...' : 'Process All Accounts'}
                                 </Button>
                                 
-                                {(apiMethod === 'GetAllMonthlies' || apiMethod === 'GetMonthlyAccount') && (
-                                    <Button
+                                <Button
                                         variant="contained"
                                         color="secondary"
                                         onClick={handleProcessIntegration}
@@ -1117,7 +1238,6 @@ const CardAudit: React.FC = () => {
                                     >
                                         {isProcessingIntegration ? 'Processing...' : 'Process Integration'}
                                     </Button>
-                                )}
                                 
                                 {isProcessingIntegration && (
                                     <Box sx={{ mt: 2, width: '100%' }}>
@@ -1134,13 +1254,13 @@ const CardAudit: React.FC = () => {
                             </Box>
                         </Stack>
 
-                        {/* Table Section */}
+                        {/* Table Section - Basic Account List */}
                         {tableData.length > 0 && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
-                                    Monthly Account Results ({tableData.length} records)
+                                    📋 Basic Account List ({tableData.length} records)
                                 </Typography>
-                                <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+                                <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                                     <Table stickyHeader>
                                         <TableHead>
                                             <TableRow>
@@ -1188,6 +1308,106 @@ const CardAudit: React.FC = () => {
                                                             {row.deleted === 'false' ? 'Active' : 'Deleted'}
                                                         </Typography>
                                                     </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Box>
+                        )}
+
+                        {/* Detailed Account Information Table */}
+                        {detailedAccountsData.length > 0 && (
+                            <Box sx={{ mt: 4 }}>
+                                <Typography variant="h6" gutterBottom>
+                                    🏢 Detailed Account Information ({detailedAccountsData.length} records)
+                                </Typography>
+                                <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                                    <Table stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Account Number</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Account Type</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>Status</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 150 }}>Company Name</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 200 }}>Address</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>City</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 80 }}>State</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>Zipcode</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Valid Until</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 80 }}>Parks</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>Department</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {detailedAccountsData.map((account, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{account.MonthlyAccountNumber || account.AccountNumber}</TableCell>
+                                                    <TableCell>{account.AccountType}</TableCell>
+                                                    <TableCell>
+                                                        <Chip 
+                                                            label={account.Status} 
+                                                            color={account.Status === 'Valid' ? 'success' : 'warning'} 
+                                                            size="small" 
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{account.CompanyName}</TableCell>
+                                                    <TableCell>{account.Address}</TableCell>
+                                                    <TableCell>{account.City}</TableCell>
+                                                    <TableCell>{account.State}</TableCell>
+                                                    <TableCell>{account.Zipcode}</TableCell>
+                                                    <TableCell>{account.ValidUntil}</TableCell>
+                                                    <TableCell>{account.Parks}</TableCell>
+                                                    <TableCell>{account.Department}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Box>
+                        )}
+
+                        {/* Contact Information Table */}
+                        {contactsData.length > 0 && (
+                            <Box sx={{ mt: 4 }}>
+                                <Typography variant="h6" gutterBottom>
+                                    👥 Contact Information ({contactsData.length} records)
+                                </Typography>
+                                <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                                    <Table stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Account Number</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Contact ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>First Name</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Last Name</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 200 }}>Email Address</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Mobile Number</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Primary Contact</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Employee ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Customer Barcode</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>RFID Number</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {contactsData.map((contact, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{contact.AccountNumber}</TableCell>
+                                                    <TableCell>{contact.ContactId}</TableCell>
+                                                    <TableCell>{contact.FirstName}</TableCell>
+                                                    <TableCell>{contact.LastName}</TableCell>
+                                                    <TableCell>{contact.EmailAddress}</TableCell>
+                                                    <TableCell>{contact.MobileNumber}</TableCell>
+                                                    <TableCell>
+                                                        <Chip 
+                                                            label={contact.PrimaryContact ? 'Yes' : 'No'} 
+                                                            color={contact.PrimaryContact ? 'primary' : 'default'} 
+                                                            size="small" 
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{contact.EmployeeId}</TableCell>
+                                                    <TableCell>{contact.CustomerBarcode}</TableCell>
+                                                    <TableCell>{contact.RFIDNumber}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -1265,47 +1485,144 @@ const CardAudit: React.FC = () => {
                                     </Grid>
                                 </Box>
 
-                                {/* Successful Accounts Table */}
-                                {integrationResult.Monthlies.length > 0 && (
+                                {/* Account Details Table */}
+                                {integrationResult.Monthlies.some(m => m.Account) && (
                                     <Box sx={{ mb: 3 }}>
                                         <Typography variant="h6" gutterBottom>
-                                            Successfully Processed Accounts ({integrationResult.Monthlies.length})
+                                            Account Details ({integrationResult.Monthlies.filter(m => m.Account).length})
                                         </Typography>
-                                        <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                                        <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
                                             <Table stickyHeader>
                                                 <TableHead>
                                                     <TableRow>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Account Number</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Flash Account</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Status</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Has Account Details</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Vehicles</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8' }}>Contacts</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Account Number</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Account Type</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>Status</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 150 }}>Company Name</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 200 }}>Address</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>City</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 80 }}>State</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 100 }}>Zipcode</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 120 }}>Valid Until</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e3f2fd', minWidth: 80 }}>Parks</TableCell>
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
-                                                    {integrationResult.Monthlies.map((monthly, index) => (
+                                                    {integrationResult.Monthlies.filter(m => m.Account).map((monthly, index) => (
                                                         <TableRow key={index}>
-                                                            <TableCell>{monthly.AccountNumber}</TableCell>
-                                                            <TableCell>{monthly.FlashAccountNumber}</TableCell>
+                                                            <TableCell>{monthly.Account?.MonthlyAccountNumber || monthly.AccountNumber}</TableCell>
+                                                            <TableCell>{monthly.Account?.AccountType}</TableCell>
                                                             <TableCell>
                                                                 <Chip 
-                                                                    label={monthly.Status} 
-                                                                    color="success" 
+                                                                    label={monthly.Account?.Status || monthly.Status} 
+                                                                    color={monthly.Account?.Status === 'Valid' ? 'success' : 'warning'} 
                                                                     size="small" 
                                                                 />
                                                             </TableCell>
-                                                            <TableCell>
-                                                                {monthly.Account ? '✓' : '✗'}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {monthly.Vehicles?.length || 0}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {monthly.Contacts?.length || 0}
-                                                            </TableCell>
+                                                            <TableCell>{monthly.Account?.CompanyName}</TableCell>
+                                                            <TableCell>{monthly.Account?.Address}</TableCell>
+                                                            <TableCell>{monthly.Account?.City}</TableCell>
+                                                            <TableCell>{monthly.Account?.State}</TableCell>
+                                                            <TableCell>{monthly.Account?.Zipcode}</TableCell>
+                                                            <TableCell>{monthly.Account?.ValidUntil}</TableCell>
+                                                            <TableCell>{monthly.Account?.Parks}</TableCell>
                                                         </TableRow>
                                                     ))}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    </Box>
+                                )}
+
+                                {/* Vehicle Details Table */}
+                                {integrationResult.Monthlies.some(m => m.Vehicles?.length) && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Vehicle Details ({integrationResult.Monthlies.reduce((total, m) => total + (m.Vehicles?.length || 0), 0)})
+                                        </Typography>
+                                        <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                                            <Table stickyHeader>
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 120 }}>Account Number</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 100 }}>Vehicle ID</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 120 }}>License Number</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 80 }}>State</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 100 }}>Make</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 100 }}>Model</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 80 }}>Color</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 120 }}>Nickname</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 120 }}>Parking Spot</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e8f5e8', minWidth: 100 }}>RFID Number</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {integrationResult.Monthlies.flatMap(monthly => 
+                                                        (monthly.Vehicles || []).map((vehicle, vIndex) => (
+                                                            <TableRow key={`${monthly.AccountNumber}-${vIndex}`}>
+                                                                <TableCell>{vehicle.AccountNumber}</TableCell>
+                                                                <TableCell>{vehicle.VehicleID}</TableCell>
+                                                                <TableCell>{vehicle.VehicleLicenseNumber}</TableCell>
+                                                                <TableCell>{vehicle.VehicleLicenseState}</TableCell>
+                                                                <TableCell>{vehicle.VehicleMake}</TableCell>
+                                                                <TableCell>{vehicle.VehicleModel}</TableCell>
+                                                                <TableCell>{vehicle.VehicleColor}</TableCell>
+                                                                <TableCell>{vehicle.VehicleNickname}</TableCell>
+                                                                <TableCell>{vehicle.ParkingSpot}</TableCell>
+                                                                <TableCell>{vehicle.RFIDNumber}</TableCell>
+                                                            </TableRow>
+                                                        ))
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    </Box>
+                                )}
+
+                                {/* Contact Details Table */}
+                                {integrationResult.Monthlies.some(m => m.Contacts?.length) && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Contact Details ({integrationResult.Monthlies.reduce((total, m) => total + (m.Contacts?.length || 0), 0)})
+                                        </Typography>
+                                        <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                                            <Table stickyHeader>
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Account Number</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Contact ID</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>First Name</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Last Name</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 200 }}>Email Address</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Mobile Number</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Primary Contact</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Employee ID</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Customer Barcode</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>RFID Number</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {integrationResult.Monthlies.flatMap(monthly => 
+                                                        (monthly.Contacts || []).map((contact, cIndex) => (
+                                                            <TableRow key={`${monthly.AccountNumber}-${cIndex}`}>
+                                                                <TableCell>{contact.AccountNumber}</TableCell>
+                                                                <TableCell>{contact.ContactId}</TableCell>
+                                                                <TableCell>{contact.FirstName}</TableCell>
+                                                                <TableCell>{contact.LastName}</TableCell>
+                                                                <TableCell>{contact.EmailAddress}</TableCell>
+                                                                <TableCell>{contact.MobileNumber}</TableCell>
+                                                                <TableCell>
+                                                                    {contact.PrimaryContact ? 
+                                                                        <Chip label="Primary" color="primary" size="small" /> :
+                                                                        <Chip label="Secondary" color="default" size="small" />
+                                                                    }
+                                                                </TableCell>
+                                                                <TableCell>{contact.EmployeeId}</TableCell>
+                                                                <TableCell>{contact.CustomerBarcode}</TableCell>
+                                                                <TableCell>{contact.RFIDNumber}</TableCell>
+                                                            </TableRow>
+                                                        ))
+                                                    )}
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
