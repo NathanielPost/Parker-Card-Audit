@@ -5,7 +5,16 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
-    assetsDir: 'assets'
+    assetsDir: 'assets',
+    sourcemap: false, // Disable source maps for production
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          mui: ['@mui/material', '@emotion/react', '@emotion/styled']
+        }
+      }
+    }
   },
   server: {
     proxy: {
@@ -21,5 +30,9 @@ export default defineConfig({
         }
       }
     }
+  },
+  define: {
+    // Ensure environment variables are available
+    __DEVELOPMENT__: JSON.stringify(process.env.NODE_ENV === 'development')
   }
 });

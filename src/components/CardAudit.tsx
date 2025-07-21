@@ -72,7 +72,17 @@ const companyTheme = createTheme({
 });
 
 
-const SOAP_ENDPOINT = '/api/integrations/monthly.asmx';
+// Environment-aware SOAP endpoint configuration
+const getSOAPEndpoint = () => {
+    // In development, use the proxy
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return '/api/integrations/monthly.asmx';
+    }
+    // In production (Render), use the direct URL
+    return 'https://int1aa.azurewebsites.net/integrations/monthly.asmx';
+};
+
+const SOAP_ENDPOINT = getSOAPEndpoint();
 // Additional SOAP endpoints for detailed account data
 const SOAP_MONTHLY_ACCOUNT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyAccount';
 const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyVehicle';
@@ -90,17 +100,41 @@ async function makeSoapRequest(endpoint: string, soapAction: string, body: strin
             'Content-Type': 'application/soap+xml; charset=utf-8',
         };
 
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body,
-    });
+    console.log('🌐 Making SOAP request to:', endpoint);
+    console.log('📋 SOAP Action:', soapAction);
+    console.log('🔧 Headers:', headers);
+    console.log('📦 Body preview:', body.substring(0, 200) + '...');
 
-    if (!response.ok) {
-        throw new Error(`SOAP request failed: ${response.status} ${response.statusText}`);
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body,
+            mode: 'cors', // Explicitly set CORS mode
+        });
+
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ HTTP Error Response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
+        }
+
+        const responseText = await response.text();
+        console.log('✅ Response received, length:', responseText.length);
+        return responseText;
+    } catch (error) {
+        console.error('❌ Network Error:', error);
+        
+        // Provide specific error messages for common issues
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+            throw new Error('🚫 Network Error: Cannot connect to SOAP endpoint. This might be due to CORS policy or network connectivity issues in production.');
+        }
+        
+        throw error;
     }
-
-    return await response.text();
 }
 
 // Function to get all monthly accounts (bulk retrieval)
@@ -824,6 +858,17 @@ const CardAudit: React.FC = () => {
                             Parker Card Audit
                         </Typography>
                         
+                        {/* Environment Info Panel */}
+                        <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'medium', color: '#1565c0' }}>
+                                🌐 Environment: {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'Development' : 'Production'}
+                                &nbsp;|&nbsp;
+                                📡 SOAP Endpoint: {SOAP_ENDPOINT}
+                                &nbsp;|&nbsp;
+                                🔧 SOAP Version: {soapVersion}
+                            </Typography>
+                        </Box>
+                        
                         {/* SOAP Version Selection */}
                         <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 2 }}>
                             <Grid container spacing={1} px={4} mb={3}>
@@ -869,8 +914,8 @@ const CardAudit: React.FC = () => {
                                     </FormControl>
                                     <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
                                         {selectedParc 
-                                            ? `Selected Location ID: ${selectedParc}`
-                                            : 'Please select a location'
+                                            ? `Selected PARCs Field ID: ${selectedParc}`
+                                            : 'Please select a PARCs Field'
                                         }
                                     </Typography>
                                 </Grid>
@@ -1321,12 +1366,36 @@ const CardAudit: React.FC = () => {
                         {data && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
-                                    Raw Response (Debug)
+                                    {data.startsWith('Error:') ? '🚫 Error Details' : '📋 Raw Response (Debug)'}
                                 </Typography>
-                                <Paper sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
-                                    <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem' }}>
+                                <Paper sx={{ 
+                                    p: 2, 
+                                    backgroundColor: data.startsWith('Error:') ? '#ffebee' : '#f5f5f5',
+                                    border: data.startsWith('Error:') ? '1px solid #f44336' : 'none'
+                                }}>
+                                    <Typography 
+                                        variant="body2" 
+                                        component="pre" 
+                                        sx={{ 
+                                            whiteSpace: 'pre-wrap', 
+                                            fontSize: '0.8rem',
+                                            color: data.startsWith('Error:') ? '#d32f2f' : 'inherit'
+                                        }}
+                                    >
                                         {data}
                                     </Typography>
+                                    
+                                    {data.includes('CORS') && (
+                                        <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff3e0', borderRadius: 1 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#f57c00' }}>
+                                                💡 CORS Issue Detected
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ mt: 1, color: '#e65100' }}>
+                                                This is likely because the SOAP endpoint doesn't allow requests from your domain in production.
+                                                In development, this works because of the Vite proxy, but in production you're making direct requests.
+                                            </Typography>
+                                        </Box>
+                                    )}
                                 </Paper>
                             </Box>
                         )}
