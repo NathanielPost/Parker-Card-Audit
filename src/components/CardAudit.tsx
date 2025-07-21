@@ -75,10 +75,10 @@ const companyTheme = createTheme({
 // SOAP endpoint - always use /api path since we have a proxy server
 const SOAP_ENDPOINT = '/api/integrations/monthly.asmx';
 // Additional SOAP endpoints for detailed account data
-const SOAP_MONTHLY_ACCOUNT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyAccount';
-const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyVehicle';
-const SOAP_MONTHLY_CONTACT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyContact';
-const SOAP_MONTHLY_PROFILES_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyProfiles';
+const SOAP_MONTHLY_ACCOUNT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyAccount1';
+const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyVehicle1';
+const SOAP_MONTHLY_CONTACT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyContact1';
+const SOAP_MONTHLY_PROFILES_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyProfiles1';
 
 // Helper function to make SOAP requests
 async function makeSoapRequest(endpoint: string, soapAction: string, body: string, soapVersion: '1.1' | '1.2') {
@@ -88,13 +88,14 @@ async function makeSoapRequest(endpoint: string, soapAction: string, body: strin
             'SOAPAction': soapAction,
         }
         : {
-            'Content-Type': 'application/soap+xml; charset=utf-8',
+            'Content-Type': 'text/xml',
         };
 
     console.log('🌐 Making SOAP request to:', endpoint);
     console.log('📋 SOAP Action:', soapAction);
     console.log('🔧 Headers:', headers);
-    console.log('📦 Body preview:', body.substring(0, 200) + '...');
+    console.log('📦 Complete SOAP Request Body:');
+    console.log(body);
 
     try {
         const response = await fetch(endpoint, {
@@ -136,11 +137,11 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
         <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
-            <includeValid>${formData.includeValid === 'True'}</includeValid>
-            <includeInvalid>${formData.includeInvalid === 'True'}</includeInvalid>
-            <includeDeleted>${formData.includeDeleted === 'True'}</includeDeleted>
+            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+            <locationId xsi:type="xsd:string">${locationId}</locationId>
+            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
+            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
+            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
         </GetAllMonthlies>
     </soap:Body>
 </soap:Envelope>`
@@ -148,11 +149,11 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
     <soap12:Body>
         <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
-            <includeValid>${formData.includeValid === 'True'}</includeValid>
-            <includeInvalid>${formData.includeInvalid === 'True'}</includeInvalid>
-            <includeDeleted>${formData.includeDeleted === 'True'}</includeDeleted>
+            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+            <locationId xsi:type="xsd:string">${locationId}</locationId>
+            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
+            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
+            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
         </GetAllMonthlies>
     </soap12:Body>
 </soap12:Envelope>`;
@@ -228,27 +229,30 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
             ? `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <GetMonthlyAccount xmlns="http://kleverlogic.com/webservices/">
+        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
-            <flashAccountNumber>${flashAccountNumber}</flashAccountNumber>
-        </GetMonthlyAccount>
+            <locationID>${locationId}</locationID>
+            <accountNumber>${flashAccountNumber}</accountNumber>
+            <accountNumberType>flash</accountNumberType>
+        </GetMonthlyAccount1>
     </soap:Body>
 </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-    <soap12:Body>
-        <GetMonthlyAccount xmlns="http://kleverlogic.com/webservices/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+    <soap:Header/>
+    <soap:Body>
+        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
-            <flashAccountNumber>${flashAccountNumber}</flashAccountNumber>
-        </GetMonthlyAccount>
-    </soap12:Body>
-</soap12:Envelope>`;
+            <locationID>${locationId}</locationID>
+            <accountNumber>${flashAccountNumber}</accountNumber>
+            <accountNumberType>flash</accountNumberType>
+        </GetMonthlyAccount1>
+    </soap:Body>
+</soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_ACCOUNT_ACTION, soapBody, soapVersion);
-        // Debug: Log raw SOAP response for GetMonthlyAccount
-        console.log(`🧾 Raw SOAP response for GetMonthlyAccount (${flashAccountNumber}):`, response);
+        // Debug: Log raw SOAP response for GetMonthlyAccount1
+        console.log(`🧾 Raw SOAP response for GetMonthlyAccount1 (${flashAccountNumber}):`, response);
         
         // Parse the response and extract account details
         const parser = new DOMParser();
@@ -258,12 +262,12 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
         const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
         if (faultElements.length > 0) {
             const faultString = faultElements[0].getElementsByTagName('faultstring')[0]?.textContent || 'Unknown SOAP fault';
-            console.error(`❌ SOAP Fault in GetMonthlyAccount: ${faultString}`);
+            console.error(`❌ SOAP Fault in GetMonthlyAccount1: ${faultString}`);
             throw new Error(`SOAP Fault: ${faultString}`);
         }
         
-        // Extract account information from GetMonthlyAccountResult
-        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyAccountResult')[0];
+        // Extract account information from GetMonthlyAccount1Result
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyAccount1Result')[0];
         if (resultElement) {
             // Check for error codes in the result
             const getElementText = (tagName: string) => {
@@ -274,11 +278,11 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
             const code = getElementText('Code');
             const message = getElementText('Message');
             
-            console.log(`📋 GetMonthlyAccount Result - Code: ${code}, Message: ${message}`);
+            console.log(`📋 GetMonthlyAccount1 Result - Code: ${code}, Message: ${message}`);
             
             // Check if the response indicates an error
             if (code && code !== 'Success') {
-                console.error(`❌ GetMonthlyAccount Error - Code: ${code}, Message: ${message}`);
+                console.error(`❌ GetMonthlyAccount1 Error - Code: ${code}, Message: ${message}`);
                 if (code === 'InvalidLogin' || message.toLowerCase().includes('invalid login')) {
                     throw new Error(`Authentication Error: ${message || 'Invalid login credentials'}`);
                 }
@@ -295,26 +299,36 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                 return element ? parseInt(element.textContent || '0', 10) : 0;
             };
 
-            // Extract Cars array
+            // Extract Cars array - now parsing CarProfile objects
             const carsElement = resultElement.getElementsByTagName('Cars')[0];
             const cars: string[] = [];
             if (carsElement) {
-                const stringElements = carsElement.getElementsByTagName('string');
-                for (let i = 0; i < stringElements.length; i++) {
-                    const carId = stringElements[i].textContent;
-                    if (carId) cars.push(carId);
+                const carProfileElements = carsElement.getElementsByTagName('CarProfile');
+                for (let i = 0; i < carProfileElements.length; i++) {
+                    const carProfile = carProfileElements[i];
+                    const vehicleGuidElement = carProfile.getElementsByTagName('VehicleGuid')[0];
+                    const vehicleGuid = vehicleGuidElement ? vehicleGuidElement.textContent : null;
+                    if (vehicleGuid) {
+                        cars.push(vehicleGuid);
+                    }
                 }
+                console.log(`🚗 Parsed ${cars.length} vehicles from CarProfile objects:`, cars);
             }
 
-            // Extract Contacts array
+            // Extract Contacts array - now parsing ContactProfile objects
             const contactsElement = resultElement.getElementsByTagName('Contacts')[0];
             const contacts: string[] = [];
             if (contactsElement) {
-                const stringElements = contactsElement.getElementsByTagName('string');
-                for (let i = 0; i < stringElements.length; i++) {
-                    const contactId = stringElements[i].textContent;
-                    if (contactId) contacts.push(contactId);
+                const contactProfileElements = contactsElement.getElementsByTagName('ContactProfile');
+                for (let i = 0; i < contactProfileElements.length; i++) {
+                    const contactProfile = contactProfileElements[i];
+                    const contactGuidElement = contactProfile.getElementsByTagName('ContactGuid')[0];
+                    const contactGuid = contactGuidElement ? contactGuidElement.textContent : null;
+                    if (contactGuid) {
+                        contacts.push(contactGuid);
+                    }
                 }
+                console.log(`👥 Parsed ${contacts.length} contacts from ContactProfile objects:`, contacts);
             }
 
             return {
@@ -329,6 +343,7 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                 CompanyName: getElementText('CompanyName'),
                 Contacts: contacts,
                 Department: getElementText('Department'),
+                ExternalId: getElementText('ExternalId'),
                 LateFeeOnKiosk: getElementBoolean('LateFeeOnKiosk'),
                 LocationID: getElementText('LocationID'),
                 MasterAccountNumber: getElementNumber('MasterAccountNumber'),
@@ -364,39 +379,70 @@ async function getMonthlyVehicle(securityToken: string, locationId: string, vehi
             ? `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <GetMonthlyVehicle xmlns="http://kleverlogic.com/webservices/">
+        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
             <locationID>${locationId}</locationID>
-            <vehicleId>${vehicleId}</vehicleId>
             <accountNumber>${accountNumber}</accountNumber>
-        </GetMonthlyVehicle>
+            <accountNumberType>flash</accountNumberType>
+            <vehicleId>${vehicleId}</vehicleId>
+            <vehicleIdType>FLASH</vehicleIdType>
+        </GetMonthlyVehicle1>
     </soap:Body>
 </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-    <soap12:Body>
-        <GetMonthlyVehicle xmlns="http://kleverlogic.com/webservices/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+    <soap:Header/>
+    <soap:Body>
+        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
             <locationID>${locationId}</locationID>
-            <vehicleId>${vehicleId}</vehicleId>
             <accountNumber>${accountNumber}</accountNumber>
-        </GetMonthlyVehicle>
-    </soap12:Body>
-</soap12:Envelope>`;
+            <accountNumberType>flash</accountNumberType>
+            <vehicleId>${vehicleId}</vehicleId>
+            <vehicleIdType>FLASH</vehicleIdType>
+        </GetMonthlyVehicle1>
+    </soap:Body>
+</soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_VEHICLE_ACTION, soapBody, soapVersion);
+        
+        // Debug: Log raw SOAP response for GetMonthlyVehicle1
+        console.log(`🧾 Raw SOAP response for GetMonthlyVehicle1 (${vehicleId}):`, response);
         
         // Parse the response and extract vehicle details
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
-        // Extract vehicle information from GetMonthlyVehicleResult
-        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyVehicleResult')[0];
+        // Check for SOAP faults first
+        const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
+        if (faultElements.length > 0) {
+            const faultString = faultElements[0].getElementsByTagName('faultstring')[0]?.textContent || 'Unknown SOAP fault';
+            console.error(`❌ SOAP Fault in GetMonthlyVehicle1: ${faultString}`);
+            throw new Error(`SOAP Fault: ${faultString}`);
+        }
+        
+        // Extract vehicle information from GetMonthlyVehicle1Result
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyVehicle1Result')[0];
         if (resultElement) {
+            // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
                 return element ? element.textContent || '' : '';
             };
+            
+            const code = getElementText('Code');
+            const message = getElementText('Message');
+            
+            console.log(`📋 GetMonthlyVehicle1 Result - Code: ${code}, Message: ${message}`);
+            
+            // Check if the response indicates an error
+            if (code && code !== 'Success') {
+                console.error(`❌ GetMonthlyVehicle1 Error - Code: ${code}, Message: ${message}`);
+                if (code === 'InvalidLogin' || message.toLowerCase().includes('invalid login')) {
+                    throw new Error(`Authentication Error: ${message || 'Invalid login credentials'}`);
+                }
+                throw new Error(`API Error: ${code} - ${message}`);
+            }
 
             return {
                 AccountNumber: getElementText('AccountNumber'),
@@ -438,39 +484,70 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
             ? `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <GetMonthlyContact xmlns="http://kleverlogic.com/webservices/">
+        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
             <locationID>${locationId}</locationID>
-            <contactId>${contactId}</contactId>
             <accountNumber>${accountNumber}</accountNumber>
-        </GetMonthlyContact>
+            <accountNumberType>flash</accountNumberType>
+            <contactID>${contactId}</contactID>
+            <contactIDType>FLASH</contactIDType>
+        </GetMonthlyContact1>
     </soap:Body>
 </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-    <soap12:Body>
-        <GetMonthlyContact xmlns="http://kleverlogic.com/webservices/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+    <soap:Header/>
+    <soap:Body>
+        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
             <securityToken>${securityToken}</securityToken>
             <locationID>${locationId}</locationID>
-            <contactId>${contactId}</contactId>
             <accountNumber>${accountNumber}</accountNumber>
-        </GetMonthlyContact>
-    </soap12:Body>
-</soap12:Envelope>`;
+            <accountNumberType>flash</accountNumberType>
+            <contactID>${contactId}</contactID>
+            <contactIDType>FLASH</contactIDType>
+        </GetMonthlyContact1>
+    </soap:Body>
+</soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_CONTACT_ACTION, soapBody, soapVersion);
+        
+        // Debug: Log raw SOAP response for GetMonthlyContact1
+        console.log(`🧾 Raw SOAP response for GetMonthlyContact1 (${contactId}):`, response);
         
         // Parse the response and extract contact details
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
         
-        // Extract contact information from GetMonthlyContactResult
-        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyContactResult')[0];
+        // Check for SOAP faults first
+        const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
+        if (faultElements.length > 0) {
+            const faultString = faultElements[0].getElementsByTagName('faultstring')[0]?.textContent || 'Unknown SOAP fault';
+            console.error(`❌ SOAP Fault in GetMonthlyContact1: ${faultString}`);
+            throw new Error(`SOAP Fault: ${faultString}`);
+        }
+        
+        // Extract contact information from GetMonthlyContact1Result
+        const resultElement = xmlDoc.getElementsByTagName('GetMonthlyContact1Result')[0];
         if (resultElement) {
+            // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
                 return element ? element.textContent || '' : '';
             };
+            
+            const code = getElementText('Code');
+            const message = getElementText('Message');
+            
+            console.log(`📋 GetMonthlyContact1 Result - Code: ${code}, Message: ${message}`);
+            
+            // Check if the response indicates an error
+            if (code && code !== 'Success') {
+                console.error(`❌ GetMonthlyContact1 Error - Code: ${code}, Message: ${message}`);
+                if (code === 'InvalidLogin' || message.toLowerCase().includes('invalid login')) {
+                    throw new Error(`Authentication Error: ${message || 'Invalid login credentials'}`);
+                }
+                throw new Error(`API Error: ${code} - ${message}`);
+            }
 
             const getElementBoolean = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
@@ -514,8 +591,8 @@ async function getMonthlyProfiles(securityToken: string, locationId: string, soa
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
         <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
+            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+            <locationId xsi:type="xsd:string">${locationId}</locationId>
         </GetMonthlyProfiles>
     </soap:Body>
 </soap:Envelope>`
@@ -523,8 +600,8 @@ async function getMonthlyProfiles(securityToken: string, locationId: string, soa
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
     <soap12:Body>
         <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationId>${locationId}</locationId>
+            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+            <locationId xsi:type="xsd:string">${locationId}</locationId>
         </GetMonthlyProfiles>
     </soap12:Body>
 </soap12:Envelope>`;
@@ -659,7 +736,7 @@ async function getIntegrationMonthlyRecords(
                                     securityToken,
                                     locationId,
                                     contactId,
-                                    account.AccountNumber,
+                                    (monthly.Account.MonthlyAccountNumber || account.AccountNumber).toString(),
                                     soapVersion
                                 );
                                 if (contactResult) {
@@ -846,17 +923,25 @@ const CardAudit: React.FC = () => {
                         if (accountDetails) {
                             detailedAccounts.push(accountDetails);
                             console.log(`✅ Account details fetched for ${account.FlashAccountNumber}`);
+                            console.log(`🔍 Account ${account.FlashAccountNumber} details:`, {
+                                MonthlyAccountNumber: accountDetails.MonthlyAccountNumber,
+                                AccountNumber: accountDetails.AccountNumber,
+                                FlashAccountNumber: accountDetails.FlashAccountNumber,
+                                ContactsArray: accountDetails.Contacts,
+                                ContactsLength: accountDetails.Contacts?.length || 0
+                            });
                             
                             // Get contacts for this account (if any)
                             if (accountDetails.Contacts && accountDetails.Contacts.length > 0) {
                                 console.log(`👥 Fetching ${accountDetails.Contacts.length} contacts for account ${account.FlashAccountNumber}`);
                                 
                                 for (const contactId of accountDetails.Contacts) {
+                                    console.log(`👥 Attempting to fetch contact with ID: ${contactId} for account: ${(accountDetails.MonthlyAccountNumber || account.AccountNumber).toString()}`);
                                     const contactDetails = await getMonthlyContact(
                                         formData.securityToken,
                                         formData.locationId,
                                         contactId,
-                                        account.AccountNumber,
+                                        (accountDetails.MonthlyAccountNumber || account.AccountNumber).toString(),
                                         soapVersion
                                     );
                                     
@@ -1215,9 +1300,6 @@ const CardAudit: React.FC = () => {
                                             </Grid>
                                         </Grid>
                             </Box>
-
-                            
-                            
                             <Box>
                                 <Button
                                     variant="contained"

@@ -48,6 +48,7 @@ export interface MonthlyAccountResult {
     CompanyName?: string;
     Contacts?: string[]; // Array of contact IDs
     Department?: string;
+    ExternalId?: string;
     LateFeeOnKiosk?: boolean;
     LocationID?: string;
     MasterAccountNumber?: number;
