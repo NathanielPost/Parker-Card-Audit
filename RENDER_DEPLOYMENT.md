@@ -36,6 +36,14 @@ npm start
 - **Node.js** (not Static Site)
 - Auto-deploy from Git: ✅
 
+## Build Process
+
+The project uses a custom Node.js build script (`build.js`) that:
+- ✅ Avoids permission issues with vite binary
+- ✅ Uses Vite's Node.js API directly
+- ✅ Works reliably on Linux servers like Render
+- ✅ Includes proper error handling
+
 ## Files Added
 
 1. **`server.js`**: Express proxy server
@@ -79,6 +87,23 @@ https://your-app.onrender.com/health
 - ❌ ~~CORS Policy Errors~~
 - ❌ ~~Environment Detection Problems~~
 - ❌ ~~Direct Azure Requests~~
+- ❌ ~~Vite Permission Issues~~
 - ✅ **Clean Proxy Architecture**
 - ✅ **Consistent Behavior**
 - ✅ **Production Ready**
+- ✅ **Reliable Build Process**
+
+## Troubleshooting
+
+### Build Issues
+If you see "Permission denied" errors:
+- The project now uses `build.js` (Node.js API) instead of vite binary
+- This avoids Linux permission issues entirely
+
+### CORS Issues
+- Should not occur with the proxy setup
+- Check server logs in Render dashboard if issues persist
+
+### Connection Issues
+- Verify the Azure endpoint is accessible: `https://int1aa.azurewebsites.net/integrations/monthly.asmx`
+- Check Render service logs for proxy request details
