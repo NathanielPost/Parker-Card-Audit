@@ -12,7 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Enable CORS for all routes
 app.use(cors({
-    origin: '*',
+    origin: ['https://parker-card-audit.onrender.com','http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'SOAPAction'],
     credentials: false
