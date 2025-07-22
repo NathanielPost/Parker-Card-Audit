@@ -18,13 +18,25 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Proxy health check to local backend
+      '/api/health': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: (path) => path, // no rewrite needed
+      },
+      // Proxy database API to local Express backend
+      '/api/database': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: (path) => path, // no rewrite needed
+      },
+      // Proxy all other /api requests to SOAP server
       '/api': {
         target: 'https://int1aa.azurewebsites.net',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
-            // Add any custom headers if needed
             proxyReq.setHeader('Origin', 'https://int1aa.azurewebsites.net');
           });
         }

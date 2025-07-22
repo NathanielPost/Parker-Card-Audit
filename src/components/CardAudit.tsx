@@ -1,29 +1,7 @@
 import React from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  TextField, 
-  Button, 
-  Select, 
-  MenuItem, 
-  FormControl, 
-  InputLabel, 
-  Stack,
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper, 
-  Box, 
-  Grid,
-  Divider,
-  LinearProgress,
-  Chip,
-  Alert
-} from '@mui/material';
+import { Card, CardContent, Typography, TextField, Button, Select, MenuItem, FormControl, InputLabel, Stack,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Box, Grid,Divider,LinearProgress,
+  Chip,Alert} from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import { 
@@ -37,8 +15,17 @@ import {
   CarProfile,
   ContactProfile,
   LocationProfile,
-  MonthlyProfilesResult
+  MonthlyProfilesResult,
+  DatabaseConfig,
+  DatabaseContact,
+  RFIDComparison,
+  databaseService
 } from '../types/ParkingCard';
+import pLimit from 'p-limit';
+const limit = pLimit(9);
+// pLimit(5) = 4942
+// pLimit(10) = 3201
+// pLimit(15) = 3779
 
 const companyTheme = createTheme({
   palette: {
@@ -81,6 +68,7 @@ const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonth
 const SOAP_MONTHLY_CONTACT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyContact1';
 const SOAP_MONTHLY_PROFILES_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyProfiles1';
 
+
 // Helper function to make SOAP requests
 async function makeSoapRequest(endpoint: string, soapAction: string, body: string, soapVersion: '1.1' | '1.2') {
     const headers: Record<string, string> = soapVersion === '1.1' 
@@ -92,12 +80,6 @@ async function makeSoapRequest(endpoint: string, soapAction: string, body: strin
             'Content-Type': 'text/xml',
         };
 
-    console.log('🌐 Making SOAP request to:', endpoint);
-    console.log('📋 SOAP Action:', soapAction);
-    console.log('🔧 Headers:', headers);
-    console.log('📦 Complete SOAP Request Body:');
-    console.log(body);
-
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -106,9 +88,6 @@ async function makeSoapRequest(endpoint: string, soapAction: string, body: strin
             mode: 'cors', // Explicitly set CORS mode
         });
 
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ HTTP Error Response:', errorText);
@@ -116,7 +95,6 @@ async function makeSoapRequest(endpoint: string, soapAction: string, body: strin
         }
 
         const responseText = await response.text();
-        console.log('✅ Response received, length:', responseText.length);
         return responseText;
     } catch (error) {
         console.error('❌ Network Error:', error);
@@ -135,29 +113,29 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
     try {
         const soapBody = soapVersion === '1.1' 
             ? `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    <soap:Body>
-        <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
-            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
-            <locationId xsi:type="xsd:string">${locationId}</locationId>
-            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
-            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
-            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
-        </GetAllMonthlies>
-    </soap:Body>
-</soap:Envelope>`
+                <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+                            <locationId xsi:type="xsd:string">${locationId}</locationId>
+                            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
+                            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
+                            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
+                        </GetAllMonthlies>
+                    </soap:Body>
+                </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-    <soap12:Body>
-        <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
-            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
-            <locationId xsi:type="xsd:string">${locationId}</locationId>
-            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
-            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
-            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
-        </GetAllMonthlies>
-    </soap12:Body>
-</soap12:Envelope>`;
+                <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+                    <soap12:Body>
+                        <GetAllMonthlies xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+                            <locationId xsi:type="xsd:string">${locationId}</locationId>
+                            <includeValid xsi:type="xsd:boolean">${formData.includeValid === 'True'}</includeValid>
+                            <includeInvalid xsi:type="xsd:boolean">${formData.includeInvalid === 'True'}</includeInvalid>
+                            <includeDeleted xsi:type="xsd:boolean">${formData.includeDeleted === 'True'}</includeDeleted>
+                        </GetAllMonthlies>
+                    </soap12:Body>
+                </soap12:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, 'http://kleverlogic.com/webservices/GetAllMonthlies', soapBody, soapVersion);
         // Debug: Log raw SOAP response for GetAllMonthlies
@@ -178,8 +156,7 @@ async function getAllMonthlies(securityToken: string, locationId: string, formDa
         // Check for GetAllMonthliesResult and any error messages
         const resultElement = xmlDoc.getElementsByTagName('GetAllMonthliesResult')[0];
         if (resultElement) {
-            // Debug: Log all child elements to see the actual structure
-            console.log(`🔍 GetAllMonthliesResult child elements:`);
+
             for (let i = 0; i < resultElement.children.length; i++) {
                 const child = resultElement.children[i];
                 console.log(`  - ${child.tagName}: ${child.textContent || `[${child.children.length} children]`}`);
@@ -266,32 +243,30 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
     try {
         const soapBody = soapVersion === '1.1' 
             ? `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    <soap:Body>
-        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${flashAccountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-        </GetMonthlyAccount1>
-    </soap:Body>
-</soap:Envelope>`
+                <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${flashAccountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                        </GetMonthlyAccount1>
+                    </soap:Body>
+                </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
-    <soap:Header/>
-    <soap:Body>
-        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${flashAccountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-        </GetMonthlyAccount1>
-    </soap:Body>
-</soap:Envelope>`;
+                <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+                    <soap:Header/>
+                    <soap:Body>
+                        <GetMonthlyAccount1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${flashAccountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                        </GetMonthlyAccount1>
+                    </soap:Body>
+                </soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_ACCOUNT_ACTION, soapBody, soapVersion);
-        // Debug: Log raw SOAP response for GetMonthlyAccount1
-        console.log(`🧾 Raw SOAP response for GetMonthlyAccount1 (${flashAccountNumber}):`, response);
         
         // Parse the response and extract account details
         const parser = new DOMParser();
@@ -308,27 +283,16 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
         // Extract account information from GetMonthlyAccount1Result
         const resultElement = xmlDoc.getElementsByTagName('GetMonthlyAccount1Result')[0];
         if (resultElement) {
-            // Debug: Log all child elements to see the actual structure
-            console.log(`🔍 GetMonthlyAccount1Result child elements for account ${flashAccountNumber}:`);
-            for (let i = 0; i < resultElement.children.length; i++) {
-                const child = resultElement.children[i];
-                console.log(`  - ${child.tagName}: ${child.textContent || `[${child.children.length} children]`}`);
-            }
             
             // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
                 const value = element ? element.textContent || '' : '';
-                if (tagName === 'MonthlyAccountNumber' || tagName === 'AccountNumber' || tagName === 'Code' || tagName === 'Status') {
-                    console.log(`🏷️ ${tagName}: "${value}"`);
-                }
                 return value;
             };
             
             const code = getElementText('Code');
             const message = getElementText('Message');
-            
-            console.log(`📋 GetMonthlyAccount1 Result - Code: ${code}, Message: ${message}`);
             
             // Check if the response indicates an error
             if (code && code !== 'Success') {
@@ -414,15 +378,6 @@ async function getMonthlyAccount(securityToken: string, locationId: string, flas
                 FlashAccountNumber: flashAccountNumber
             };
 
-            console.log(`✅ Parsed account result for ${flashAccountNumber}:`, {
-                AccountNumber: accountResult.AccountNumber,
-                MonthlyAccountNumber: accountResult.MonthlyAccountNumber,
-                CompanyName: accountResult.CompanyName,
-                Status: accountResult.Status,
-                ContactsCount: accountResult.Contacts?.length || 0,
-                CarsCount: accountResult.Cars?.length || 0
-            });
-
             return accountResult;
         }
         
@@ -438,37 +393,34 @@ async function getMonthlyVehicle(securityToken: string, locationId: string, vehi
     try {
         const soapBody = soapVersion === '1.1' 
             ? `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    <soap:Body>
-        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${accountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-            <vehicleId>${vehicleId}</vehicleId>
-            <vehicleIdType>FLASH</vehicleIdType>
-        </GetMonthlyVehicle1>
-    </soap:Body>
-</soap:Envelope>`
+                <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${accountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                            <vehicleId>${vehicleId}</vehicleId>
+                            <vehicleIdType>FLASH</vehicleIdType>
+                        </GetMonthlyVehicle1>
+                    </soap:Body>
+                </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
-    <soap:Header/>
-    <soap:Body>
-        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${accountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-            <vehicleId>${vehicleId}</vehicleId>
-            <vehicleIdType>FLASH</vehicleIdType>
-        </GetMonthlyVehicle1>
-    </soap:Body>
-</soap:Envelope>`;
+                <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+                    <soap:Header/>
+                    <soap:Body>
+                        <GetMonthlyVehicle1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${accountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                            <vehicleId>${vehicleId}</vehicleId>
+                            <vehicleIdType>FLASH</vehicleIdType>
+                        </GetMonthlyVehicle1>
+                    </soap:Body>
+                </soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_VEHICLE_ACTION, soapBody, soapVersion);
-        
-        // Debug: Log raw SOAP response for GetMonthlyVehicle1
-        console.log(`🧾 Raw SOAP response for GetMonthlyVehicle1 (${vehicleId}):`, response);
         
         // Parse the response and extract vehicle details
         const parser = new DOMParser();
@@ -493,8 +445,6 @@ async function getMonthlyVehicle(securityToken: string, locationId: string, vehi
             
             const code = getElementText('Code');
             const message = getElementText('Message');
-            
-            console.log(`📋 GetMonthlyVehicle1 Result - Code: ${code}, Message: ${message}`);
             
             // Check if the response indicates an error
             if (code && code !== 'Success') {
@@ -543,44 +493,38 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
     try {
         const soapBody = soapVersion === '1.1' 
             ? `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    <soap:Body>
-        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${accountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-            <contactID>${contactId}</contactID>
-            <contactIDType>FLASH</contactIDType>
-        </GetMonthlyContact1>
-    </soap:Body>
-</soap:Envelope>`
+                <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${accountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                            <contactID>${contactId}</contactID>
+                            <contactIDType>FLASH</contactIDType>
+                        </GetMonthlyContact1>
+                    </soap:Body>
+                </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
-    <soap:Header/>
-    <soap:Body>
-        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
-            <securityToken>${securityToken}</securityToken>
-            <locationID>${locationId}</locationID>
-            <accountNumber>${accountNumber}</accountNumber>
-            <accountNumberType>flash</accountNumberType>
-            <contactID>${contactId}</contactID>
-            <contactIDType>FLASH</contactIDType>
-        </GetMonthlyContact1>
-    </soap:Body>
-</soap:Envelope>`;
+                <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+                    <soap:Header/>
+                    <soap:Body>
+                        <GetMonthlyContact1 xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken>${securityToken}</securityToken>
+                            <locationID>${locationId}</locationID>
+                            <accountNumber>${accountNumber}</accountNumber>
+                            <accountNumberType>flash</accountNumberType>
+                            <contactID>${contactId}</contactID>
+                            <contactIDType>FLASH</contactIDType>
+                        </GetMonthlyContact1>
+                    </soap:Body>
+                </soap:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_CONTACT_ACTION, soapBody, soapVersion);
-        
-        // Debug: Log raw SOAP response for GetMonthlyContact1
-        console.log(`🧾 Raw SOAP response for GetMonthlyContact1 (${contactId}):`, response);
         
         // Parse the response and extract contact details
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(response, 'text/xml');
-        
-        // Debug: Log the parsed XML structure
-        console.log(`🔍 Parsed XML for contact ${contactId}:`, xmlDoc);
         
         // Check for SOAP faults first
         const faultElements = xmlDoc.getElementsByTagName('soap:Fault');
@@ -593,32 +537,22 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
         // Extract contact information from GetMonthlyContact1Result
         const resultElement = xmlDoc.getElementsByTagName('GetMonthlyContact1Result')[0];
         if (resultElement) {
-            // Debug: Log all child elements to see the actual structure
-            console.log(`🔍 GetMonthlyContact1Result child elements for contact ${contactId}:`);
-            for (let i = 0; i < resultElement.children.length; i++) {
-                const child = resultElement.children[i];
-                console.log(`  - ${child.tagName}: ${child.textContent}`);
-            }
             
             // Check for error codes in the result
             const getElementText = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
                 const value = element ? element.textContent || '' : '';
-                console.log(`🏷️ ${tagName}: "${value}"`);
                 return value;
             };
             
             const getElementBoolean = (tagName: string) => {
                 const element = resultElement.getElementsByTagName(tagName)[0];
                 const value = element ? element.textContent?.toLowerCase() === 'true' : false;
-                console.log(`🏷️ ${tagName}: ${value} (from "${element?.textContent}")`);
                 return value;
             };
             
             const code = getElementText('Code');
             const message = getElementText('Message');
-            
-            console.log(`📋 GetMonthlyContact1 Result - Code: ${code}, Message: ${message}`);
             
             // Check if the response indicates an error
             if (code && code !== 'Success') {
@@ -650,7 +584,6 @@ async function getMonthlyContact(securityToken: string, locationId: string, cont
                 Phone: getElementText('MobileNumber')  // Map to backward compatibility field
             };
 
-            console.log(`✅ Parsed contact result for ${contactId}:`, contactResult);
             return contactResult;
         }
         
@@ -666,23 +599,23 @@ async function getMonthlyProfiles(securityToken: string, locationId: string, soa
     try {
         const soapBody = soapVersion === '1.1' 
             ? `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    <soap:Body>
-        <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
-            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
-            <locationId xsi:type="xsd:string">${locationId}</locationId>
-        </GetMonthlyProfiles>
-    </soap:Body>
-</soap:Envelope>`
+                <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                    <soap:Body>
+                        <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+                            <locationId xsi:type="xsd:string">${locationId}</locationId>
+                        </GetMonthlyProfiles>
+                    </soap:Body>
+                </soap:Envelope>`
             : `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-    <soap12:Body>
-        <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
-            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
-            <locationId xsi:type="xsd:string">${locationId}</locationId>
-        </GetMonthlyProfiles>
-    </soap12:Body>
-</soap12:Envelope>`;
+                <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+                    <soap12:Body>
+                        <GetMonthlyProfiles xmlns="http://kleverlogic.com/webservices/">
+                            <securityToken xsi:type="xsd:string">${securityToken}</securityToken>
+                            <locationId xsi:type="xsd:string">${locationId}</locationId>
+                        </GetMonthlyProfiles>
+                    </soap12:Body>
+                </soap12:Envelope>`;
 
         const response = await makeSoapRequest(SOAP_ENDPOINT, SOAP_MONTHLY_PROFILES_ACTION, soapBody, soapVersion);
         
@@ -775,16 +708,11 @@ async function getIntegrationMonthlyRecords(
                     
                     if (monthlyAccount) {
                         monthly.Account = monthlyAccount;
-                        console.log(`✅ Successfully fetched account details for ${account.FlashAccountNumber}:`, monthlyAccount);
-                        console.log(`📋 Cars array:`, monthlyAccount.Cars);
-                        console.log(`📋 Contacts array:`, monthlyAccount.Contacts);
                         
                         // Process vehicles if account has cars
                         const monthlyVehicles: MonthlyVehicleResult[] = [];
                         if (monthly.Account?.Cars?.length) {
-                            console.log(`🚗 Processing ${monthly.Account.Cars.length} vehicles for account ${account.FlashAccountNumber}`);
                             for (const carId of monthly.Account.Cars) {
-                                console.log(`🚗 Fetching vehicle details for carId: ${carId}`);
                                 const vehicle = await getMonthlyVehicle(
                                     securityToken,
                                     locationId,
@@ -794,7 +722,6 @@ async function getIntegrationMonthlyRecords(
                                 );
                                 if (vehicle) {
                                     monthlyVehicles.push(vehicle);
-                                    console.log(`✅ Processed vehicle: ${vehicle.VehicleLicenseNumber} for account: ${account.AccountNumber}`);
                                 } else {
                                     console.log(`❌ No vehicle data returned for carId: ${carId}`);
                                 }
@@ -807,9 +734,7 @@ async function getIntegrationMonthlyRecords(
                         // Process contacts if account has contacts
                         const monthlyContacts: MonthlyContactResult[] = [];
                         if (monthly.Account?.Contacts?.length) {
-                            console.log(`👥 Processing ${monthly.Account.Contacts.length} contacts for account ${account.FlashAccountNumber}`);
                             for (const contactId of monthly.Account.Contacts) {
-                                console.log(`👥 Fetching contact details for contactId: ${contactId}`);
                                 const contactResult = await getMonthlyContact(
                                     securityToken,
                                     locationId,
@@ -819,7 +744,6 @@ async function getIntegrationMonthlyRecords(
                                 );
                                 if (contactResult) {
                                     monthlyContacts.push(contactResult);
-                                    console.log(`✅ Processed contact: ${contactResult.FirstName} ${contactResult.LastName} for account: ${account.AccountNumber}`);
                                 } else {
                                     console.log(`❌ No contact data returned for contactId: ${contactId}`);
                                 }
@@ -870,7 +794,7 @@ async function getIntegrationMonthlyRecords(
             ProcessingTimeMs: endTime - startTime
         }
     };
-} // <-- Add this closing brace to terminate getIntegrationMonthlyRecords
+}
 
 // Function to deduplicate contacts based on name and account, merging data intelligently
 function deduplicateContacts(contacts: MonthlyContactResult[]): MonthlyContactResult[] {
@@ -985,7 +909,7 @@ const CardAudit: React.FC = () => {
         ]
     };
 
-    const handleInputChange = (field: keyof ParkingCard) => (event: any) => {
+        const handleInputChange = (field: keyof ParkingCard) => (event: any) => {
         const value = event.target.value;
         setFormData(prev => ({
             ...prev,
@@ -1039,14 +963,12 @@ const CardAudit: React.FC = () => {
             if (accounts.length > 0) {
                 // Step 2: For each account, get detailed account information and contacts
                 console.log('📋 Step 2: Fetching detailed account information and contacts...');
-                const detailedAccounts: MonthlyAccountResult[] = [];
-                const allContacts: MonthlyContactResult[] = [];
-                let processedCount = 0;
-                
-                for (const account of accounts) {
+                console.time('processAllAccounts and contacts');
+
+                const accountPromises = accounts.map(account => limit(async () => {
+                    const accountDetails: MonthlyAccountResult[] = [];
+                    const contactDetails: MonthlyContactResult[] = [];
                     try {
-                        console.log(`🔍 Processing account ${processedCount + 1}/${accounts.length}: ${account.FlashAccountNumber}`);
-                        
                         // Get detailed account information
                         const accountDetails = await getMonthlyAccount(
                             formData.securityToken, 
@@ -1055,59 +977,60 @@ const CardAudit: React.FC = () => {
                             soapVersion
                         );
                         
-                        if (accountDetails) {
-                            detailedAccounts.push(accountDetails);
-                            console.log(`✅ Account details fetched for ${account.FlashAccountNumber}`);
-                            console.log(`🔍 Account ${account.FlashAccountNumber} details:`, {
-                                MonthlyAccountNumber: accountDetails.MonthlyAccountNumber,
-                                AccountNumber: accountDetails.AccountNumber,
-                                FlashAccountNumber: accountDetails.FlashAccountNumber,
-                                ContactsArray: accountDetails.Contacts,
-                                ContactsLength: accountDetails.Contacts?.length || 0
-                            });
-                            
-                            // Get contacts for this account (if any)
-                            if (accountDetails.Contacts && accountDetails.Contacts.length > 0) {
-                                console.log(`👥 Fetching ${accountDetails.Contacts.length} contacts for account ${account.FlashAccountNumber}`);
-                                
-                                for (const contactId of accountDetails.Contacts) {
-                                    console.log(`👥 Attempting to fetch contact with ID: ${contactId} for account: ${(accountDetails.MonthlyAccountNumber || account.AccountNumber).toString()}`);
-                                    const contactDetails = await getMonthlyContact(
-                                        formData.securityToken,
-                                        formData.locationId,
-                                        contactId,
-                                        (accountDetails.MonthlyAccountNumber || account.AccountNumber).toString(),
-                                        soapVersion
-                                    );
-                                    
-                                    if (contactDetails) {
-                                        allContacts.push(contactDetails);
-                                        console.log(`✅ Contact details fetched: ${contactDetails.FirstName} ${contactDetails.LastName}`);
-                                    }
+                        if (accountDetails && (accountDetails.Contacts ?? []).length > 0) {
+                            for (const contactId of accountDetails.Contacts ?? []) {
+                                const contact = await getMonthlyContact(
+                                    formData.securityToken,
+                                    formData.locationId,
+                                    contactId,
+                                    (accountDetails.MonthlyAccountNumber || account.AccountNumber).toString(),
+                                    soapVersion
+                                );
+                                if (contact) {
+                                    contactDetails.push(contact);
                                 }
-                            } else {
-                                console.log(`⚠️ No contacts found for account ${account.FlashAccountNumber}`);
                             }
-                        } else {
-                            console.log(`❌ Failed to fetch account details for ${account.FlashAccountNumber}`);
-                            console.log('securityToken:', formData.securityToken);
                         }
-                        
-                        processedCount++;
-                        
                     } catch (error) {
                         console.error(`❌ Error processing account ${account.FlashAccountNumber}:`, error);
-                        processedCount++;
                     }
-                }
-                
+                    return { accountDetails, contactDetails };
+                }));
+
+                const results = await Promise.all(accountPromises);
+
+                // Flatten and filter results
+                const detailedAccounts = results
+                    .map(r => r.accountDetails)
+                    .filter(Boolean) as MonthlyAccountResult[];
+
+                const allContacts = results
+                    .flatMap(r => r.contactDetails)
+                    .filter(Boolean) as MonthlyContactResult[];
+
                 // Deduplicate contacts before storing
                 const deduplicatedContacts = deduplicateContacts(allContacts);
                 
                 // Store the results
                 setDetailedAccountsData(detailedAccounts);
                 setContactsData(deduplicatedContacts);
+                console.timeEnd('processAllAccounts and contacts');
                 console.log(`✅ Step 2 Complete: Fetched ${detailedAccounts.length} detailed accounts and ${allContacts.length} contacts (${deduplicatedContacts.length} after deduplication)`);
+                
+                // If comparison is enabled, automatically compare with database
+                if (comparisonEnabled && deduplicatedContacts.length > 0) {
+                    console.log('🔄 Auto-comparing RFID data with database...');
+                    try {
+                        const accountNumbers = [...new Set(deduplicatedContacts.map(contact => contact.AccountNumber).filter(Boolean))] as string[];
+                        const dbContacts = await databaseService.getContactsFromDatabase(accountNumbers);
+                        setDatabaseContacts(dbContacts);
+
+                        const comparisons = await databaseService.getRFIDComparison(deduplicatedContacts, dbContacts);
+                        setRfidComparisons(comparisons);
+                    } catch (error) {
+                        console.error('Error in auto-comparison:', error);
+                    }
+                }
             }
             
             setIntegrationResult(null);
@@ -1176,6 +1099,185 @@ const CardAudit: React.FC = () => {
             alert('Error processing integration. Please check the console for details.');
         } finally {
             setIsProcessingIntegration(false);
+        }
+    };
+
+    const DATABASE_CONFIG: DatabaseConfig = {
+        server: 'lazdatawarehouse01.lazparking.com',
+        database: 'Subscription',
+        username: 'subscription_writer',
+        password: 'ar[xN7GOq891+krl1',
+        encrypt: false,
+        multipleActiveResultSets: true
+    };
+
+    const [databaseContacts, setDatabaseContacts] = useState<DatabaseContact[]>([]);
+    const [rfidComparisons, setRfidComparisons] = useState<RFIDComparison[]>([]);
+    const [isComparingRFIDs, setIsComparingRFIDs] = useState(false);
+    const [comparisonEnabled, setComparisonEnabled] = useState(false);
+    const [accessIds, setAccessIds] = useState<string[]>([]);
+
+    // Add this useEffect to run when component mounts
+    useEffect(() => {
+        const fetchDatabaseSchema = async () => {
+            try {
+                console.log('🔍 Fetching database schema on page load...');
+                const response = await fetch('/api/database/schema');
+                if (response.ok) {
+                    const schema = await response.json();
+                    console.log('✅ Database schema loaded:', schema);
+                } else {
+                    console.error('❌ Failed to fetch database schema RESPONSE:', response.statusText);
+                }
+            } catch (error) {
+                console.error('❌ Error fetching database schema:', error);
+            }
+        };
+
+        fetchDatabaseSchema();
+    }, []);
+
+    const handlePullAccessId = async (): Promise<string[]> => {
+        if (formData.locationId) {
+            try {
+                console.log(`🔍 Fetching Access IDs for locationId: ${formData.locationId}`);
+                const response = await fetch(`/api/database/accessIds_for_location?locationCode=${formData.locationId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const accessIdsArray = data.data || data.accessIds || data || [];
+                    setAccessIds(accessIdsArray);
+                    console.log('✅ Access IDs fetched and set:', accessIdsArray);
+                    return accessIdsArray; // Return the actual dataF
+                } else {
+                    console.error('❌ Error fetching Access IDs:', response.statusText);
+                    return [];
+                }
+            } catch (error) {
+                console.error('❌ Error fetching Access IDs:', error);
+                return [];
+            }
+        } else {
+            console.error('❌ Location ID is required to fetch Access IDs');
+            return [];
+        }
+    };
+
+    const handleCompareRFIDs = async () => {
+        if (contactsData.length === 0) {
+            alert('Please fetch contact data first before comparing RFIDs.');
+            return;
+        }
+
+        if (accessIds.length === 0) {
+            alert('Please fetch Access IDs from database first before comparing RFIDs.');
+            return;
+        }
+
+        setIsComparingRFIDs(true);
+        
+        try {
+            console.log('🔍 Starting RFID comparison using Access IDs...');
+            console.log(`📋 Comparing ${contactsData.length} SOAP contacts with ${accessIds.length} database Access IDs`);
+            
+            // Extract SOAP RFIDs (filter out empty/null values)
+            const soapRFIDs = contactsData
+                .map(contact => contact.RFIDNumber?.trim())
+                .filter(Boolean) as string[];
+            
+            // Convert to lowercase for case-insensitive comparison
+            const soapRFIDsLower = soapRFIDs.map(rfid => rfid.toLowerCase());
+            const accessIdsLower = accessIds.map(id => id.toLowerCase());
+            
+            // 1. RFIDs in BOTH lists (intersection)
+            const inBothLists = soapRFIDs.filter(soapRfid => 
+                accessIdsLower.includes(soapRfid.toLowerCase())
+            );
+            
+            // 2. RFIDs ONLY in SOAP (SOAP - Database)
+            const onlyInSOAP = soapRFIDs.filter(soapRfid => 
+                !accessIdsLower.includes(soapRfid.toLowerCase())
+            );
+            
+            // 3. RFIDs ONLY in Database (Database - SOAP)
+            const onlyInDatabase = accessIds.filter(accessId => 
+                !soapRFIDsLower.includes(accessId.toLowerCase())
+            );
+            
+            // Create comparison results for the table display
+            const comparisons: RFIDComparison[] = [];
+            
+            // Add matches (in both lists)
+            inBothLists.forEach(rfid => {
+                const contact = contactsData.find(c => 
+                    c.RFIDNumber?.trim().toLowerCase() === rfid.toLowerCase()
+                );
+                if (contact) {
+                    comparisons.push({
+                        accountNumber: contact.AccountNumber || '',
+                        contactId: contact.ContactId || '',
+                        firstName: contact.FirstName || '',
+                        lastName: contact.LastName || '',
+                        soapRFID: rfid,
+                        databaseRFID: rfid,
+                        status: 'Match',
+                        match: true
+                    });
+                }
+            });
+            
+            // Add SOAP only
+            onlyInSOAP.forEach(rfid => {
+                const contact = contactsData.find(c => 
+                    c.RFIDNumber?.trim().toLowerCase() === rfid.toLowerCase()
+                );
+                if (contact) {
+                    comparisons.push({
+                        accountNumber: contact.AccountNumber || '',
+                        contactId: contact.ContactId || '',
+                        firstName: contact.FirstName || '',
+                        lastName: contact.LastName || '',
+                        soapRFID: rfid,
+                        databaseRFID: '',
+                        status: 'PARCs Only',
+                        match: false
+                    });
+                }
+            });
+            
+            // Add Database only
+            onlyInDatabase.forEach(accessId => {
+                comparisons.push({
+                    accountNumber: 'Unknown',
+                    contactId: 'Unknown',
+                    firstName: 'Unknown',
+                    lastName: 'Contact',
+                    soapRFID: '',
+                    databaseRFID: accessId,
+                    status: 'Database Only',
+                    match: false
+                });
+            });
+            
+            setRfidComparisons(comparisons);
+            
+            // Log the three lists
+            console.log(`📊 RFID Comparison Results:`);
+            console.log(`✅ In BOTH lists (${inBothLists.length}):`, inBothLists);
+            console.log(`🟡 Only in SOAP (${onlyInSOAP.length}):`, onlyInSOAP);
+            console.log(`🔵 Only in Database (${onlyInDatabase.length}):`, onlyInDatabase);
+            
+            console.log(`📋 Summary:`);
+            console.log(`  - Total SOAP RFIDs: ${soapRFIDs.length}`);
+            console.log(`  - Total Database Access IDs: ${accessIds.length}`);
+            console.log(`  - Matches: ${inBothLists.length}`);
+            console.log(`  - SOAP Only: ${onlyInSOAP.length}`);
+            console.log(`  - Database Only: ${onlyInDatabase.length}`);
+            
+        } catch (error) {
+            console.error('Error comparing RFIDs with Access IDs:', error);
+            alert('Error comparing RFID data with Access IDs. Please check the console for details.');
+        } finally {
+            setIsComparingRFIDs(false);
         }
     };
 
@@ -1325,6 +1427,15 @@ const CardAudit: React.FC = () => {
                                         </Box>
                                     </Stack>
                                 </Grid>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={comparisonEnabled}
+                                        onChange={(e) => setComparisonEnabled(e.target.checked)}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    <Typography variant="caption">Auto-Compare with Database</Typography>
+                                </Box>
                             </Grid>
                         </Box>
                         
@@ -1372,77 +1483,107 @@ const CardAudit: React.FC = () => {
                                 {/* Always show GetAllMonthlies filters */}
                                 <Divider variant="middle" sx={{ borderColor: '#B20838', my: 2 }} />
                                 <Grid container spacing={1} px={3} mb={3}>
-                                            <Grid size={3}>
-                                                <Typography variant="h6">Request Filters</Typography>
-                                            </Grid>
-                                            <Grid size={9}>
-                                                <Stack direction={{ xs: 'column', md: 'row' }} mb={2} mt={2} spacing={2}>
-                                                    <TextField
-                                                        fullWidth
-                                                        type="datetime-local"
-                                                        label="Date"
-                                                        value={formData.Date.toISOString().slice(0, 16)}
-                                                        onChange={handleInputChange('Date')}
-                                                        variant="outlined"
-                                                        InputLabelProps={{ shrink: true }}
-                                                    />
-                                                    <FormControl fullWidth variant="outlined">
-                                                        <InputLabel>Parker Status</InputLabel>
-                                                        <Select
-                                                            value={formData.ParkerStatus}
-                                                            onChange={handleInputChange('ParkerStatus')}
-                                                            label="Parker Status"
-                                                        >
-                                                            <MenuItem value="Active">Active</MenuItem>
-                                                            <MenuItem value="Inactive">Inactive</MenuItem>
-                                                            <MenuItem value="Deleted">Deleted</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                </Stack>
-                                                
-                                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                                                    <FormControl fullWidth variant="outlined">
-                                                        <InputLabel>Include Valid</InputLabel>
-                                                        <Select
-                                                            value={formData.includeValid}
-                                                            onChange={handleInputChange('includeValid')}
-                                                            label="Include Valid"
-                                                        >
-                                                            <MenuItem value="True">True</MenuItem>
-                                                            <MenuItem value="False">False</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                    <FormControl fullWidth variant="outlined">
-                                                        <InputLabel>Include Invalid</InputLabel>
-                                                        <Select
-                                                            value={formData.includeInvalid}
-                                                            onChange={handleInputChange('includeInvalid')}
-                                                            label="Include Invalid"
-                                                        >
-                                                            <MenuItem value="True">True</MenuItem>
-                                                            <MenuItem value="False">False</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                    <FormControl fullWidth variant="outlined">
-                                                        <InputLabel>Include Deleted</InputLabel>
-                                                        <Select
-                                                            value={formData.includeDeleted}
-                                                            onChange={handleInputChange('includeDeleted')}
-                                                            label="Include Deleted"
-                                                        >
-                                                            <MenuItem value="True">True</MenuItem>
-                                                            <MenuItem value="False">False</MenuItem>
-                                                        </Select>
-                                                    </FormControl>
-                                                </Stack>
-                                            </Grid>
-                                        </Grid>
+                                    <Grid size={3}>
+                                        <Typography variant="h6">Request Filters</Typography>
+                                    </Grid>
+                                    <Grid size={9}>
+                                        <Stack direction={{ xs: 'column', md: 'row' }} mb={2} mt={2} spacing={2}>
+                                            <TextField
+                                                fullWidth
+                                                type="datetime-local"
+                                                label="Date"
+                                                value={formData.Date.toISOString().slice(0, 16)}
+                                                onChange={handleInputChange('Date')}
+                                                variant="outlined"
+                                                InputLabelProps={{ shrink: true }}
+                                            />
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Parker Status</InputLabel>
+                                                <Select
+                                                    value={formData.ParkerStatus}
+                                                    onChange={handleInputChange('ParkerStatus')}
+                                                    label="Parker Status"
+                                                >
+                                                    <MenuItem value="Active">Active</MenuItem>
+                                                    <MenuItem value="Inactive">Inactive</MenuItem>
+                                                    <MenuItem value="Deleted">Deleted</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Stack>
+                                        
+                                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Valid</InputLabel>
+                                                <Select
+                                                    value={formData.includeValid}
+                                                    onChange={handleInputChange('includeValid')}
+                                                    label="Include Valid"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Invalid</InputLabel>
+                                                <Select
+                                                    value={formData.includeInvalid}
+                                                    onChange={handleInputChange('includeInvalid')}
+                                                    label="Include Invalid"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl fullWidth variant="outlined">
+                                                <InputLabel>Include Deleted</InputLabel>
+                                                <Select
+                                                    value={formData.includeDeleted}
+                                                    onChange={handleInputChange('includeDeleted')}
+                                                    label="Include Deleted"
+                                                >
+                                                    <MenuItem value="True">True</MenuItem>
+                                                    <MenuItem value="False">False</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Stack>
+                                    </Grid>
+                                </Grid>
                             </Box>
                             <Box>
                                 <Button
                                     variant="contained"
                                     color="primary"
-                                    onClick={handleFetchData}
+                                    onClick={async () => {
+                                        try {
+                                            // Step 1: Fetch data
+                                            await handleFetchData();
+                                            
+                                            // Step 2: Get access IDs and wait for the result
+                                            const fetchedAccessIds = await handlePullAccessId();
+                                            console.log('🔍 Button click - fetched accessIds:', fetchedAccessIds);
+                                            
+                                            // Step 3: Only run comparison if we have both datasets
+                                            if (contactsData.length > 0 && fetchedAccessIds.length > 0) {
+                                                console.log('✅ Both datasets available, running comparison...');
+                                                await handleCompareRFIDs();
+                                            } else {
+                                                console.warn('⚠️ Missing data for comparison:', {
+                                                    contactsCount: contactsData.length,
+                                                    accessIdsCount: fetchedAccessIds.length
+                                                });
+                                                
+                                                // Show user-friendly message
+                                                if (fetchedAccessIds.length === 0) {
+                                                    alert('No Access IDs found in database for this location.');
+                                                } else if (contactsData.length === 0) {
+                                                    alert('No contact data available. Please fetch contact data first.');
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('❌ Error in button click handler:', error);
+                                            alert('Error processing data. Please check the console for details.');
+                                        }
+                                    }}
                                     disabled={loading || !formData.securityToken || !formData.locationId}
                                     sx={{ mr: 2 }}
                                 >
@@ -1450,14 +1591,23 @@ const CardAudit: React.FC = () => {
                                 </Button>
                                 
                                 <Button
-                                        variant="contained"
-                                        color="secondary"
-                                        onClick={handleProcessIntegration}
-                                        disabled={isProcessingIntegration || rawAccounts.length === 0}
-                                        sx={{ mr: 2 }}
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={handleProcessIntegration}
+                                    disabled={isProcessingIntegration || rawAccounts.length === 0}
+                                    sx={{ mr: 2 }}
                                     >
-                                        {isProcessingIntegration ? 'Processing...' : 'Process Integration'}
-                                    </Button>
+                                    {isProcessingIntegration ? 'Processing...' : 'Process Integration'}
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={handleCompareRFIDs}
+                                    disabled={isComparingRFIDs || contactsData.length === 0}
+                                    sx={{ mr: 2 }}
+                                >
+                                    {isComparingRFIDs ? 'Comparing...' : 'Compare RFIDs with Database'}
+                                </Button>
                                 
                                 {isProcessingIntegration && (
                                     <Box sx={{ mt: 2, width: '100%' }}>
@@ -1697,15 +1847,16 @@ const CardAudit: React.FC = () => {
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Account Number</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Contact ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>RFID Number</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>First Name</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Last Name</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Contact ID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 200 }}>Email Address</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Mobile Number</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>Primary Contact</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Employee ID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 120 }}>Customer Barcode</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#fff3e0', minWidth: 100 }}>RFID Number</TableCell>
+                                                
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -1725,9 +1876,10 @@ const CardAudit: React.FC = () => {
                                                     }}>
                                                         {contact.AccountNumber}
                                                     </TableCell>
-                                                    <TableCell>{contact.ContactId}</TableCell>
+                                                    <TableCell>{contact.RFIDNumber}</TableCell>
                                                     <TableCell>{contact.FirstName}</TableCell>
                                                     <TableCell>{contact.LastName}</TableCell>
+                                                    <TableCell>{contact.ContactId}</TableCell>
                                                     <TableCell>{contact.EmailAddress}</TableCell>
                                                     <TableCell>{contact.MobileNumber}</TableCell>
                                                     <TableCell>
@@ -1739,7 +1891,7 @@ const CardAudit: React.FC = () => {
                                                     </TableCell>
                                                     <TableCell>{contact.EmployeeId}</TableCell>
                                                     <TableCell>{contact.CustomerBarcode}</TableCell>
-                                                    <TableCell>{contact.RFIDNumber}</TableCell>
+                                                    
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -1999,6 +2151,100 @@ const CardAudit: React.FC = () => {
                                         </TableContainer>
                                     </Box>
                                 )}
+                            </Box>
+                        )}
+                        {rfidComparisons.length > 0 && (
+                            <Box sx={{ mt: 4 }}>
+                                <Typography variant="h6" gutterBottom>
+                                    🔍 RFID Comparison Results ({rfidComparisons.length} records)
+                                </Typography>
+                                
+                                {/* Comparison Summary */}
+                                <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 2 }}>
+                                    <Grid container spacing={2}>
+                                        <Grid size={3}>
+                                            <Chip 
+                                                label={`Matches: ${rfidComparisons.filter(c => c.status === 'Match').length}`} 
+                                                color="success" 
+                                                variant="outlined" 
+                                            />
+                                        </Grid>
+                                        <Grid size={3}>
+                                            <Chip 
+                                                label={`Mismatches: ${rfidComparisons.filter(c => c.status === 'Mismatch').length}`} 
+                                                color="error" 
+                                                variant="outlined" 
+                                            />
+                                        </Grid>
+                                        <Grid size={3}>
+                                            <Chip 
+                                                label={`PARCs Only: ${rfidComparisons.filter(c => c.status === 'PARCs Only').length}`} 
+                                                color="warning" 
+                                                variant="outlined" 
+                                            />
+                                        </Grid>
+                                        <Grid size={3}>
+                                            <Chip 
+                                                label={`Database Only: ${rfidComparisons.filter(c => c.status === 'Database Only').length}`} 
+                                                color="info" 
+                                                variant="outlined" 
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+
+                                <TableContainer component={Paper} sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                                    <Table stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>Account Number</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 100 }}>Contact ID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 150 }}>Contact Name</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>SOAP RFID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>Database RFID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 100 }}>Status</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 80 }}>Match</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {rfidComparisons
+                                                .filter(comparison => !selectedAccountNumber || comparison.accountNumber === selectedAccountNumber)
+                                                .map((comparison, index) => (
+                                                <TableRow 
+                                                    key={index}
+                                                    sx={{
+                                                        backgroundColor: 
+                                                            comparison.status === 'Match' ? '#e8f5e8' :
+                                                            comparison.status === 'Mismatch' ? '#ffebee' :
+                                                            comparison.status === 'PARCs Only' ? '#fff3e0' :
+                                                            comparison.status === 'Database Only' ? '#e3f2fd' : undefined
+                                                    }}
+                                                >
+                                                    <TableCell>{comparison.accountNumber}</TableCell>
+                                                    <TableCell>{comparison.contactId}</TableCell>
+                                                    <TableCell>{`${comparison.firstName} ${comparison.lastName}`}</TableCell>
+                                                    <TableCell>{comparison.soapRFID || '(none)'}</TableCell>
+                                                    <TableCell>{comparison.databaseRFID || '(none)'}</TableCell>
+                                                    <TableCell>
+                                                        <Chip 
+                                                            label={comparison.status} 
+                                                            color={
+                                                                comparison.status === 'Match' ? 'success' :
+                                                                comparison.status === 'Mismatch' ? 'error' :
+                                                                comparison.status === 'PARCs Only' ? 'warning' :
+                                                                'info'
+                                                            }
+                                                            size="small" 
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {comparison.match ? '✅' : '❌'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
                             </Box>
                         )}
 

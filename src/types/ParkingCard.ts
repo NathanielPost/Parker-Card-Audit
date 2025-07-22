@@ -147,3 +147,135 @@ export interface MonthlyProfilesResult {
     Message: string;
     LocationProfiles: LocationProfile[];
 }
+
+export interface DatabaseConfig {
+    server: string;
+    database: string;
+    username: string;
+    password: string;
+    encrypt: boolean;
+    multipleActiveResultSets: boolean;
+}
+
+export interface DatabaseContact {
+    ContactId: string;
+    AccountNumber: string;
+    FirstName: string;
+    LastName: string;
+    RFIDNumber: string;
+    EmailAddress: string;
+    PrimaryContact: boolean;
+    // Add other fields as needed
+}
+
+export interface RFIDComparison {
+    contactId: string;
+    accountNumber: string;
+    firstName: string;
+    lastName: string;
+    soapRFID: string;
+    databaseRFID: string;
+    match: boolean;
+    status: 'Match' | 'PARCs Only' | 'Database Only' | 'Mismatch';
+}
+
+class DatabaseService {
+    private readonly apiEndpoint = '/api/database';
+
+    async getContactsFromDatabase(accountNumbers?: string[]): Promise<DatabaseContact[]> {
+        try {
+            const response = await fetch(`${this.apiEndpoint}/contacts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ accountNumbers })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Database query failed: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching contacts from database:', error);
+            throw error;
+        }
+    }
+
+    async getRFIDComparison(soapContacts: any[], databaseContacts: DatabaseContact[]): Promise<RFIDComparison[]> {
+        const comparisons: RFIDComparison[] = [];
+        
+        // Create maps for efficient lookup
+        const soapContactMap = new Map(
+            soapContacts.map(contact => [
+                `${contact.AccountNumber}-${contact.ContactId}`,
+                contact
+            ])
+        );
+        
+        const databaseContactMap = new Map(
+            databaseContacts.map(contact => [
+                `${contact.AccountNumber}-${contact.ContactId}`,
+                contact
+            ])
+        );
+
+        // Find all unique contact identifiers
+        const allContactKeys = new Set([
+            ...soapContactMap.keys(),
+            ...databaseContactMap.keys()
+        ]);
+
+        for (const contactKey of allContactKeys) {
+            const soapContact = soapContactMap.get(contactKey);
+            const dbContact = databaseContactMap.get(contactKey);
+
+            if (soapContact && dbContact) {
+                // Both sources have this contact
+                const match = soapContact.RFIDNumber === dbContact.RFIDNumber;
+                comparisons.push({
+                    contactId: soapContact.ContactId || dbContact.ContactId,
+                    accountNumber: soapContact.AccountNumber || dbContact.AccountNumber,
+                    firstName: soapContact.FirstName || dbContact.FirstName,
+                    lastName: soapContact.LastName || dbContact.LastName,
+                    soapRFID: soapContact.RFIDNumber || '',
+                    databaseRFID: dbContact.RFIDNumber || '',
+                    match,
+                    status: match ? 'Match' : 'Mismatch'
+                });
+            } else if (soapContact) {
+                // Only in SOAP data
+                comparisons.push({
+                    contactId: soapContact.ContactId,
+                    accountNumber: soapContact.AccountNumber,
+                    firstName: soapContact.FirstName,
+                    lastName: soapContact.LastName,
+                    soapRFID: soapContact.RFIDNumber || '',
+                    databaseRFID: '',
+                    match: false,
+                    status: 'PARCs Only'
+                });
+            } else if (dbContact) {
+                // Only in database
+                comparisons.push({
+                    contactId: dbContact.ContactId,
+                    accountNumber: dbContact.AccountNumber,
+                    firstName: dbContact.FirstName,
+                    lastName: dbContact.LastName,
+                    soapRFID: '',
+                    databaseRFID: dbContact.RFIDNumber || '',
+                    match: false,
+                    status: 'Database Only'
+                });
+            }
+        }
+
+        return comparisons.sort((a, b) => 
+            a.accountNumber.localeCompare(b.accountNumber) || 
+            a.lastName.localeCompare(b.lastName)
+        );
+    }
+}
+
+export const databaseService = new DatabaseService();

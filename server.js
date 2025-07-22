@@ -4,7 +4,11 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
+
+// Middleware for parsing JSON
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Enable CORS for all routes
 app.use(cors({
@@ -13,6 +17,19 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'SOAPAction'],
     credentials: false
 }));
+
+app.get('/api/health', (req, res) => {
+    console.log('🏥 Health check endpoint hit!');
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        message: 'Backend server is running!'
+    });
+});
+
+// Database routes
+const databaseRouter = require('./database');
+app.use('/api/database', databaseRouter);
 
 // Proxy configuration for SOAP requests
 const soapProxyOptions = {
@@ -53,8 +70,13 @@ const soapProxyOptions = {
     }
 };
 
-// Apply SOAP proxy middleware
-app.use('/api', createProxyMiddleware(soapProxyOptions));
+// SOAP proxy - exclude database routes
+app.use('/api', (req, res, next) => {
+    if (req.path.startsWith('/database')) {
+        return next(); // Skip proxy for database routes
+    }
+    createProxyMiddleware(soapProxyOptions)(req, res, next);
+});
 
 // Serve static files from the dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
