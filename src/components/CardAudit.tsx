@@ -81,40 +81,6 @@ declare global {
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
 
-useEffect(() => {
-    const fetchDatabaseSchema = async () => {
-        try {
-            console.log('🔍 Fetching database schema on page load...');
-            const response = await fetch(`${API_BASE}/api/database/schema`);
-            if (response.ok) {
-                const schema = await response.json();
-                console.log('✅ Database schema loaded:', schema);
-            } else {
-                console.error('❌ Failed to fetch database schema RESPONSE:', response.statusText);
-            }
-        } catch (error) {
-            console.error('❌ Error fetching database schema:', error);
-        }
-    };
-
-    fetchDatabaseSchema();
-    const checkBackend = async () => {
-        try {
-            const response = await fetch(`${API_BASE}/api/health`);
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Connected to backend:', data);
-            } else {
-                console.error('❌ Backend health check failed:', response.status, response.statusText);
-            }
-        } catch (error) {
-            console.error('❌ Error connecting to backend:', error);
-        }
-    };
-    checkBackend();
-}, []);
-
-
 // Helper function to make SOAP requests
 async function makeSoapRequest(endpoint: string, soapAction: string, body: string, soapVersion: '1.1' | '1.2') {
     const headers: Record<string, string> = soapVersion === '1.1' 
@@ -1163,7 +1129,38 @@ const CardAudit: React.FC = () => {
     const [comparisonEnabled, setComparisonEnabled] = useState(false);
     const [accessIds, setAccessIds] = useState<string[]>([]);
 
+    useEffect(() => {
+        const fetchDatabaseSchema = async () => {
+            try {
+                console.log('🔍 Fetching database schema on page load...');
+                const response = await fetch(`${API_BASE}/api/database/schema`);
+                if (response.ok) {
+                    const schema = await response.json();
+                    console.log('✅ Database schema loaded:', schema);
+                } else {
+                    console.error('❌ Failed to fetch database schema RESPONSE:', response.statusText);
+                }
+            } catch (error) {
+                console.error('❌ Error fetching database schema:', error);
+            }
+        };
 
+        fetchDatabaseSchema();
+        const checkBackend = async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Connected to backend:', data);
+                } else {
+                    console.error('❌ Backend health check failed:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('❌ Error connecting to backend:', error);
+            }
+        };
+        checkBackend();
+    }, []);
 
     const handlePullAccessId = async (): Promise<string[]> => {
         if (formData.locationId) {
@@ -1769,7 +1766,7 @@ const CardAudit: React.FC = () => {
                             </Box>
                         )}
 
-                        {/* Detailed Account Information Table */}
+                        {/* Detailed Account Information Table 
                         {detailedAccountsData.length > 0 && (
                             <Box sx={{ mt: 4 }}>
                                 <Typography variant="h6" gutterBottom>
@@ -1848,6 +1845,7 @@ const CardAudit: React.FC = () => {
                                 </TableContainer>
                             </Box>
                         )}
+                        */}
 
                         {/* Contact Information Table */}
                         {contactsData.length > 0 && (
