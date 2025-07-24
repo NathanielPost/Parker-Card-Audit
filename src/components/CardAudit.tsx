@@ -80,20 +80,24 @@ declare global {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
-try {
-    const response = await fetch(`${API_BASE}/api/database/accessIds_for_location?...`);
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Backend error:', response.status, response.statusText, errorText);
-    } else {
-        const data = await response.json();
-        console.log('✅ Data from backend:', data);
-    }
-} catch (error) {
-    console.error('❌ Network or fetch error:', error);
-}
 
 useEffect(() => {
+    const fetchDatabaseSchema = async () => {
+        try {
+            console.log('🔍 Fetching database schema on page load...');
+            const response = await fetch(`${API_BASE}/api/database/schema`);
+            if (response.ok) {
+                const schema = await response.json();
+                console.log('✅ Database schema loaded:', schema);
+            } else {
+                console.error('❌ Failed to fetch database schema RESPONSE:', response.statusText);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching database schema:', error);
+        }
+    };
+
+    fetchDatabaseSchema();
     const checkBackend = async () => {
         try {
             const response = await fetch(`${API_BASE}/api/health`);
@@ -1159,25 +1163,7 @@ const CardAudit: React.FC = () => {
     const [comparisonEnabled, setComparisonEnabled] = useState(false);
     const [accessIds, setAccessIds] = useState<string[]>([]);
 
-    // Add this useEffect to run when component mounts
-    useEffect(() => {
-        const fetchDatabaseSchema = async () => {
-            try {
-                console.log('🔍 Fetching database schema on page load...');
-                const response = await fetch('/api/database/schema');
-                if (response.ok) {
-                    const schema = await response.json();
-                    console.log('✅ Database schema loaded:', schema);
-                } else {
-                    console.error('❌ Failed to fetch database schema RESPONSE:', response.statusText);
-                }
-            } catch (error) {
-                console.error('❌ Error fetching database schema:', error);
-            }
-        };
 
-        fetchDatabaseSchema();
-    }, []);
 
     const handlePullAccessId = async (): Promise<string[]> => {
         if (formData.locationId) {
