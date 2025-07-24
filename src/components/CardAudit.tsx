@@ -69,7 +69,35 @@ const SOAP_MONTHLY_CONTACT_ACTION = 'http://kleverlogic.com/webservices/GetMonth
 const SOAP_MONTHLY_PROFILES_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyProfiles1';
 
 // deployed backend
+// Add this declaration if not already present in your project (e.g., in a global.d.ts file)
+declare global {
+  interface ImportMeta {
+    env: {
+      [key: string]: string | undefined;
+      VITE_API_BASE?: string;
+    };
+  }
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
+fetch(`${API_BASE}/api/database/accessIds_for_location`)
+
+useEffect(() => {
+    const checkBackend = async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/health`);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Connected to backend:', data);
+            } else {
+                console.error('❌ Backend health check failed:', response.status, response.statusText);
+            }
+        } catch (error) {
+            console.error('❌ Error connecting to backend:', error);
+        }
+    };
+    checkBackend();
+}, []);
 
 
 // Helper function to make SOAP requests
