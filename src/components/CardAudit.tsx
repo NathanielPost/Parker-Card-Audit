@@ -1219,6 +1219,7 @@ const CardAudit: React.FC = () => {
                         lastName: contact.LastName || '',
                         soapRFID: rfid,
                         databaseRFID: rfid,
+                        allRFID: rfid,
                         status: 'Match',
                         match: true
                     });
@@ -1238,6 +1239,7 @@ const CardAudit: React.FC = () => {
                         lastName: contact.LastName || '',
                         soapRFID: rfid,
                         databaseRFID: '',
+                        allRFID: rfid,
                         status: 'PARCs Only',
                         match: false
                     });
@@ -1253,7 +1255,8 @@ const CardAudit: React.FC = () => {
                     lastName: 'Contact',
                     soapRFID: '',
                     databaseRFID: accessId,
-                    status: 'Database Only',
+                    allRFID: accessId,
+                    status: 'Subscription Only',
                     match: false
                 });
             });
@@ -1271,7 +1274,8 @@ const CardAudit: React.FC = () => {
             console.log(`  - Total Database Access IDs: ${accessIds.length}`);
             console.log(`  - Matches: ${inBothLists.length}`);
             console.log(`  - SOAP Only: ${onlyInSOAP.length}`);
-            console.log(`  - Database Only: ${onlyInDatabase.length}`);
+            console.log(`  - Subscription Only: ${onlyInDatabase.length}`);
+            console.log(`  - Total Comparisons: ${rfidComparisons.length}`);
             
         } catch (error) {
             console.error('Error comparing RFIDs with Access IDs:', error);
@@ -2185,7 +2189,7 @@ const CardAudit: React.FC = () => {
                                         </Grid>
                                         <Grid size={3}>
                                             <Chip 
-                                                label={`Database Only: ${rfidComparisons.filter(c => c.status === 'Database Only').length}`} 
+                                                label={`Subscription Only: ${rfidComparisons.filter(c => c.status === 'Subscription Only').length}`} 
                                                 color="info" 
                                                 variant="outlined" 
                                             />
@@ -2198,10 +2202,8 @@ const CardAudit: React.FC = () => {
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>Account Number</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 100 }}>Contact ID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 150 }}>Contact Name</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>SOAP RFID</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>Database RFID</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 120 }}>All RFID</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 100 }}>Status</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f3e5f5', minWidth: 80 }}>Match</TableCell>
                                             </TableRow>
@@ -2217,14 +2219,12 @@ const CardAudit: React.FC = () => {
                                                             comparison.status === 'Match' ? '#e8f5e8' :
                                                             comparison.status === 'Mismatch' ? '#ffebee' :
                                                             comparison.status === 'PARCs Only' ? '#fff3e0' :
-                                                            comparison.status === 'Database Only' ? '#e3f2fd' : undefined
+                                                            comparison.status === 'Subscription Only' ? '#e3f2fd' : undefined
                                                     }}
                                                 >
                                                     <TableCell>{comparison.accountNumber}</TableCell>
-                                                    <TableCell>{comparison.contactId}</TableCell>
                                                     <TableCell>{`${comparison.firstName} ${comparison.lastName}`}</TableCell>
-                                                    <TableCell>{comparison.soapRFID || '(none)'}</TableCell>
-                                                    <TableCell>{comparison.databaseRFID || '(none)'}</TableCell>
+                                                    <TableCell>{comparison.allRFID || '(none)'}</TableCell>
                                                     <TableCell>
                                                         <Chip 
                                                             label={comparison.status} 

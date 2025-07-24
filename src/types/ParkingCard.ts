@@ -175,8 +175,9 @@ export interface RFIDComparison {
     lastName: string;
     soapRFID: string;
     databaseRFID: string;
+    allRFID: string;
     match: boolean;
-    status: 'Match' | 'PARCs Only' | 'Database Only' | 'Mismatch';
+    status: 'Match' | 'PARCs Only' | 'Subscription Only' | 'Mismatch';
 }
 
 class DatabaseService {
@@ -241,6 +242,7 @@ class DatabaseService {
                     lastName: soapContact.LastName || dbContact.LastName,
                     soapRFID: soapContact.RFIDNumber || '',
                     databaseRFID: dbContact.RFIDNumber || '',
+                    allRFID: soapContact.RFIDNumber || dbContact.RFIDNumber || '',
                     match,
                     status: match ? 'Match' : 'Mismatch'
                 });
@@ -253,6 +255,7 @@ class DatabaseService {
                     lastName: soapContact.LastName,
                     soapRFID: soapContact.RFIDNumber || '',
                     databaseRFID: '',
+                    allRFID: soapContact.RFIDNumber || '',
                     match: false,
                     status: 'PARCs Only'
                 });
@@ -265,8 +268,9 @@ class DatabaseService {
                     lastName: dbContact.LastName,
                     soapRFID: '',
                     databaseRFID: dbContact.RFIDNumber || '',
+                    allRFID: dbContact.RFIDNumber || '',
                     match: false,
-                    status: 'Database Only'
+                    status: 'Subscription Only'
                 });
             }
         }

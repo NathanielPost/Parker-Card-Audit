@@ -221,7 +221,7 @@ router.get('/accessIds_for_location', async (req, res) => {
         console.log(`🔍 QUERY 3: Testing Members...`);
         try {
             members = await sql.query(`
-                SELECT id FROM Members
+                SELECT id, firstName, lastName, email FROM Members
                 WHERE subscriptionId IN (${subscriptionIds.join(', ')})
             `);
             console.log(`✅ QUERY 3 SUCCESS: Found ${members.recordset.length} members`);
@@ -236,6 +236,7 @@ router.get('/accessIds_for_location', async (req, res) => {
         }
 
         const memberIds = members.recordset.map(m => m.id);
+
         console.log(`🔍 Using memberIds: [${memberIds.join(', ')}]`);
 
         // QUERY 4: Test Tokens with detailed logging
@@ -348,6 +349,31 @@ router.get('/members', async (req, res) => {
 });
 
 router.get('/debug-locations', async (req, res) => {
+    try {
+        await sql.connect(config);
+        
+        // Check for bad LOCATION_CODE values
+        const badData = await sql.query(`
+            SELECT LOCATION_CODE, LOCATION_ID, COUNT(*) as count
+            FROM Parcs_Locations 
+            WHERE LOCATION_CODE IS NOT NULL
+            AND TRY_CAST(LOCATION_CODE AS INT) IS NULL
+            GROUP BY LOCATION_CODE, LOCATION_ID
+            ORDER BY count DESC
+        `);
+        
+        res.json({
+            message: 'Bad LOCATION_CODE data found',
+            badValues: badData.recordset
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    } finally {
+        await sql.close();
+    }
+});
+
+router.get('/databaseOnlyContacts', async (req, res) => {
     try {
         await sql.connect(config);
         
