@@ -68,6 +68,9 @@ const SOAP_MONTHLY_VEHICLE_ACTION = 'http://kleverlogic.com/webservices/GetMonth
 const SOAP_MONTHLY_CONTACT_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyContact1';
 const SOAP_MONTHLY_PROFILES_ACTION = 'http://kleverlogic.com/webservices/GetMonthlyProfiles1';
 
+// deployed backend
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
+
 
 // Helper function to make SOAP requests
 async function makeSoapRequest(endpoint: string, soapAction: string, body: string, soapVersion: '1.1' | '1.2') {
