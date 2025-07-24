@@ -80,7 +80,18 @@ declare global {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
-fetch(`${API_BASE}/api/database/accessIds_for_location`)
+try {
+    const response = await fetch(`${API_BASE}/api/database/accessIds_for_location?...`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Backend error:', response.status, response.statusText, errorText);
+    } else {
+        const data = await response.json();
+        console.log('✅ Data from backend:', data);
+    }
+} catch (error) {
+    console.error('❌ Network or fetch error:', error);
+}
 
 useEffect(() => {
     const checkBackend = async () => {
