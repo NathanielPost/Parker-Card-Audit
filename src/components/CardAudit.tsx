@@ -79,7 +79,7 @@ declare global {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://parkerauditbackend.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://my-backend.onrender.com';
 
 // Helper function to make SOAP requests
 async function makeSoapRequest(endpoint: string, soapAction: string, body: string, soapVersion: '1.1' | '1.2') {
@@ -1166,19 +1166,26 @@ const CardAudit: React.FC = () => {
         if (formData.locationId) {
             try {
                 console.log(`🔍 Fetching Access IDs for locationId: ${formData.locationId}`);
-                const response = await fetch(`/api/database/accessIds_for_location?locationCode=${formData.locationId}`);
+                const response = await fetch(`${API_BASE}/api/database/accessIds_for_location?locationCode=${formData.locationId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
                 if (response.ok) {
                     const data = await response.json();
-                    const accessIdsArray = data.data || data.accessIds || data || [];
+                    const accessIdsArray = data.accessIds || data.data || [];
                     setAccessIds(accessIdsArray);
                     console.log('✅ Access IDs fetched and set:', accessIdsArray);
-                    return accessIdsArray; // Return the actual dataF
+                    return accessIdsArray;
                 } else {
-                    console.error('❌ Error fetching Access IDs:', response.statusText);
+                    const errorText = await response.text();
+                    console.error('❌ Backend error:', response.status, response.statusText, errorText);
                     return [];
                 }
             } catch (error) {
-                console.error('❌ Error fetching Access IDs:', error);
+                console.error('❌ Network or fetch error:', error);
                 return [];
             }
         } else {
