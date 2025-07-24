@@ -85,6 +85,27 @@ const sql = require('mssql');
 
 const router = express.Router();
 
+const { Pool } = require('pg')
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/mydatabase',
+    ssl: {
+        rejectUnauthorized: false
+    }
+})
+
+const pool = require('./database');
+
+app.get('/api/test', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error connecting to DB");
+  }
+});
+
 // your DB config
 const config = {
     server: 'lazdatawarehouse01.lazparking.com',
